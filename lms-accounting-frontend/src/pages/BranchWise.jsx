@@ -54,7 +54,7 @@ export default function BranchWise() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Reports · Branch"
+        // eyebrow="Reports · Branch"
         title="Branch-wise Summary"
         // description="Posted disbursement totals and loan application counts, grouped by branch."
       />

@@ -32,9 +32,9 @@ export default function ProfitLoss() {
   return (
     <>
       <PageHeader
-        eyebrow="Reports · 06"
+        // eyebrow="Reports · 06"
         title="Profit & Loss"
-        description="Interest income, processing fee income and penalty income, less expenses, for the selected period."
+        // description="Interest income, processing fee income and penalty income, less expenses, for the selected period."
         action={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <input

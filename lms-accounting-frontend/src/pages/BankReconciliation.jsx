@@ -57,7 +57,7 @@ export default function BankReconciliation() {
     <div className="space-y-6">
       <PageHeader
         title="Bank Reconciliation"
-        description="Compare book balance against bank statement balance for the selected cash account and statement date."
+        // description="Compare book balance against bank statement balance for the selected cash account and statement date."
       />
 
       {error && (

@@ -35,7 +35,7 @@ export default function CustomerLedger() {
   return (
     <>
       <PageHeader
-        eyebrow="Reports · Customer"
+        // eyebrow="Reports · Customer"
         title="Customer Ledger"
         // description="Every posted journal entry traced back to a customer's loan applications — disbursements, EMI collections, penalties, write-offs, all in one place."
       />

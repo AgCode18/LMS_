@@ -56,7 +56,7 @@ export default function AccountLedger() {
       <PageHeader
         // eyebrow="Reports · 05"
         title="General Ledger"
-        description="Choose an account to view its posted ledger lines and running balance."
+        // description="Choose an account to view its posted ledger lines and running balance."
       />
 
       {error && (
@@ -64,7 +64,7 @@ export default function AccountLedger() {
           {error}
         </div>
       )}
-
+{/* 
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-[0.68rem] uppercase tracking-[0.24em] text-slate-500">
           Quick access:
@@ -83,7 +83,7 @@ export default function AccountLedger() {
             </button>
           );
         })}
-      </div>
+      </div> */}
 
       <div className="rounded-4xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
