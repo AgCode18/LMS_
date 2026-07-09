@@ -1,0 +1,369 @@
+datasource db {
+  provider = "mysql"
+  // url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =====================================================================
+// NOTE: This is a TRIMMED-DOWN copy of your real LMS schema, kept only
+// so this project runs standalone. It includes every model the
+// Accounting Engine touches directly (Account, JournalEntry,
+// JournalEntryLine, VoucherCounter) plus lightweight stand-ins for
+// models it hooks into (LoanApplication, EmiPayment, LoanDisbursement,
+// LoanRecovery, foreClosure, Customer, Branch).
+//
+// TO INTEGRATE INTO YOUR REAL PROJECT: delete this file, and drop the
+// /src folder (services, controllers, routes) into your existing
+// backend that already has your full schema — every field/model this
+// code references already exists there with matching names.
+// =====================================================================
+
+model Branch {
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  isActive Boolean @default(true)
+
+  loanApplications  LoanApplication[]
+  loanDisbursements LoanDisbursement[]
+}
+
+model Customer {
+  id            String  @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?
+  contactNumber String
+
+  loanApplications LoanApplication[]
+  loanRecoveries   LoanRecovery[]
+}
+
+model LoanApplication {
+  id              String   @id @default(cuid())
+  loanNumber      String   @unique
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  requestedAmount Float
+  approvedAmount  Float?
+  processingFees  Float?
+  status          String   @default("APPLICATION_STARTED")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  kycId String? @unique
+  kyc   Kyc?    @relation(fields: [kycId], references: [id])
+
+  loanDisbursement LoanDisbursement[]
+  loanRecoveries   LoanRecovery[]
+  emis             LoanEmiSchedule[]
+  foreClosures     foreClosure[]
+  sanctions        Sanction[]
+  nachMandates     NachMandate[]
+}
+
+// Trimmed stand-ins for KYC / Sanction / NACH so the disbursement
+// eligibility check (KYC verified + Sanction approved + NACH active)
+// has real data to query. Your real schema already has fuller versions
+// of these (Kyc, Sanction, NachMandate) — same names/enums, so the
+// eligibility check in loanLifecycleService.js works unchanged once
+// merged into your real backend.
+model Kyc {
+  id         String    @id @default(cuid())
+  status     KycStatus @default(PENDING)
+  remarks    String?
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  loanApplication LoanApplication?
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Sanction {
+  id                    String          @id @default(cuid())
+  loanApplicationNumber String
+  loanApplication       LoanApplication @relation(fields: [loanApplicationNumber], references: [loanNumber])
+  sanctionedAmount      Float
+  status                SanctionStatus  @default(PENDING)
+  approvedAt            DateTime?
+  approvedBy            String?
+  createdAt             DateTime        @default(now())
+
+  @@index([loanApplicationNumber])
+}
+
+enum SanctionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PARTIAL
+}
+
+model NachMandate {
+  id                String          @id @default(cuid())
+  loanApplicationId String
+  loanApplication   LoanApplication @relation(fields: [loanApplicationId], references: [id])
+  customerId        String
+  status            NachStatus      @default(PENDING)
+  maxDebitAmount    Float
+  createdAt         DateTime        @default(now())
+
+  @@index([loanApplicationId])
+}
+
+enum NachStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  FAILED
+  CANCELLED
+}
+
+model LoanEmiSchedule {
+  id                String          @id @default(cuid())
+  loanApplicationId String
+  loanApplication   LoanApplication @relation(fields: [loanApplicationId], references: [id])
+  emiNo             Int
+  dueDate           DateTime
+  emiAmount         Float
+  status            String          @default("pending")
+
+  emiPayments EmiPayment[]
+
+  @@index([loanApplicationId, emiNo])
+}
+
+model EmiPayment {
+  id                   String           @id @default(cuid())
+  emiScheduleId        String
+  emiSchedule          LoanEmiSchedule  @relation(fields: [emiScheduleId], references: [id])
+  amount               Float
+  principalPaid        Float            @default(0)
+  interestPaid         Float            @default(0)
+  penaltyPaid          Float            @default(0)
+  bouncePaid           Float            @default(0)
+  excessAmount         Float            @default(0)
+  paymentDate          DateTime
+  paymentMode          String
+  transactionReference String?
+  journalEntryId       String?
+  accountingStatus     AccountingStatus @default(PENDING)
+  processedById        String?
+  branchId             String?
+  remarks              String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model LoanDisbursement {
+  id                   String           @id @default(cuid())
+  loanApplicationId    String
+  loanApplication      LoanApplication  @relation(fields: [loanApplicationId], references: [id])
+  amount               Float
+  principalAmount      Float
+  interestAmount       Float            @default(0)
+  chargesAmount        Float?
+  currency             String           @default("INR")
+  disbursementMode     String
+  disbursementStatus   String           @default("PENDING")
+  disbursementDate     DateTime         @default(now())
+  transactionReference String           @unique
+  bankName             String?
+  bankAccountNumber    String?
+  ifscCode             String?
+  accountHolderName    String?
+  processedBy          String?
+  branchId             String
+  branch               Branch           @relation(fields: [branchId], references: [id])
+  remarks              String?
+  accountingStatus     AccountingStatus @default(PENDING)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  journalEntries       JournalEntry[]
+
+  @@index([loanApplicationId])
+  @@index([transactionReference])
+}
+
+model LoanRecovery {
+  id                     String          @id @default(cuid())
+  loanApplicationId      String
+  loanApplication        LoanApplication @relation(fields: [loanApplicationId], references: [id])
+  customerId             String
+  customer               Customer        @relation(fields: [customerId], references: [id])
+  totalOutstandingAmount Float
+  recoveredAmount        Float
+  balanceAmount          Float
+  settlementAmount       Float?
+  settlementDate         DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  recoveryPayments RecoveryPayment[]
+}
+
+model RecoveryPayment {
+  id               String           @id @default(cuid())
+  loanRecoveryId   String
+  loanRecovery     LoanRecovery     @relation(fields: [loanRecoveryId], references: [id])
+  amount           Float
+  paymentDate      DateTime
+  paymentMode      String
+  referenceNo      String?
+  accountingStatus AccountingStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+}
+
+model foreClosure {
+  id                   String           @id @default(cuid())
+  loanApplicationId    String
+  loanApplication      LoanApplication  @relation(fields: [loanApplicationId], references: [id])
+  principalOutstanding Float?
+  interestAccrued      Float?
+  penalty              Float?
+  totalPayable         Float?
+  settledAmount        Float?
+  settledAt            DateTime?
+  approvalStatus       String           @default("PENDING")
+  accountingStatus     AccountingStatus @default(PENDING)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+// =====================================================================
+// ACCOUNTING ENGINE — the part built by this project
+// =====================================================================
+
+model Account {
+  id              String             @id @default(cuid())
+  code            String             @unique
+  name            String
+  type            AccountType
+  systemKey       String?            @unique
+  parentAccountId String?
+  parentAccount   Account?           @relation("ParentChild", fields: [parentAccountId], references: [id])
+  childAccounts   Account[]          @relation("ParentChild")
+  openingBalance  Float              @default(0)
+  currentBalance  Float              @default(0)
+  status          AccountStatus      @default(ACTIVE)
+  description     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  journalLines    JournalEntryLine[]
+
+  @@index([type])
+  @@index([status])
+  @@index([parentAccountId])
+  @@map("accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  INCOME
+  EXPENSE
+  EQUITY
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AccountingStatus {
+  PENDING
+  JOURNAL_CREATED
+  POSTED
+}
+
+enum VoucherType {
+  JOURNAL
+  RECEIPT
+  PAYMENT
+  CONTRA
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum ReferenceType {
+  LOAN_DISBURSEMENT
+  EMI_PAYMENT
+  RECOVERY
+  FORECLOSURE
+  PROCESSING_FEE
+  PARTNER_COMMISSION
+  PENALTY
+  WRITE_OFF
+  REFUND
+  MANUAL
+}
+
+model VoucherCounter {
+  year      Int      @id
+  sequence  Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model JournalEntry {
+  id                 String             @id @default(cuid())
+  voucherNo          String             @unique
+  voucherType        VoucherType        @default(JOURNAL)
+  transactionDate    DateTime
+  referenceType      ReferenceType?
+  referenceId        String?
+  narration          String?
+  totalDebit         Float
+  totalCredit        Float
+  currency           String             @default("INR")
+  status             JournalStatus      @default(DRAFT)
+  postedAt           DateTime?
+  cancelledAt        DateTime?
+  createdById        String?
+  approvedById       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  lines              JournalEntryLine[]
+  loanDisbursement   LoanDisbursement?  @relation(fields: [loanDisbursementId], references: [id])
+  loanDisbursementId String?
+
+  @@index([voucherNo])
+  @@index([transactionDate])
+  @@index([status])
+  @@index([referenceType])
+}
+
+model JournalEntryLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  accountId      String
+  debit          Float        @default(0)
+  credit         Float        @default(0)
+  description    String?
+  createdAt      DateTime     @default(now())
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+
+// bank reconcilation statement model for accounting engine
+
+
