@@ -9,12 +9,24 @@ class ReportServiceError extends Error {
   }
 }
 
+const startOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const endOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+
 const dateRangeWhere = (from, to) => {
   if (!from && !to) return {};
   return {
     transactionDate: {
-      ...(from && { gte: new Date(from) }),
-      ...(to && { lte: new Date(to) }),
+      ...(from && { gte: startOfDay(from) }),
+      ...(to && { lte: endOfDay(to) }),
     },
   };
 };
@@ -125,7 +137,7 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
       accountId,
       journalEntry: {
         status: 'POSTED',
-        transactionDate: { lte: new Date(statementDate) },
+        transactionDate: { lte: endOfDay(statementDate) },
       },
     },
     include: { journalEntry: true },
@@ -138,30 +150,35 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
   const computedRows = allLines.map((l) => {
     running += debitNormal ? l.debit - l.credit : l.credit - l.debit;
     return {
+      id: l.id,
       date: l.journalEntry.transactionDate,
       voucherNo: l.journalEntry.voucherNo,
       narration: l.description ?? l.journalEntry.narration,
       debit: l.debit,
       credit: l.credit,
       runningBalance: running,
-      isDepositInTransit: l.debit > 0,
-      isOutstandingCheck: l.credit > 0,
+      isCleared: l.isCleared,
+      clearedDate: l.clearedDate,
+      // Only uncleared lines are "in transit" / "outstanding" — this is
+      // the actual definition of a reconciling item.
+      isDepositInTransit: l.debit > 0 && !l.isCleared,
+      isOutstandingCheck: l.credit > 0 && !l.isCleared,
     };
   });
 
   const filteredRows = computedRows.filter((row) => {
     const date = new Date(row.date);
-    if (from && date < new Date(from)) return false;
-    if (to && date > new Date(to)) return false;
+    if (from && date < startOfDay(from)) return false;
+    if (to && date > endOfDay(to)) return false;
     return true;
   });
 
   const depositsInTransit = computedRows
-    .filter((row) => row.debit > 0)
+    .filter((row) => row.isDepositInTransit)
     .reduce((sum, row) => sum + row.debit, 0);
 
   const outstandingChecks = computedRows
-    .filter((row) => row.credit > 0)
+    .filter((row) => row.isOutstandingCheck)
     .reduce((sum, row) => sum + row.credit, 0);
 
   return {
@@ -175,6 +192,22 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
     netAdjustment: depositsInTransit - outstandingChecks,
   };
 }
+
+/** Marks a single journal entry line as cleared/uncleared by the bank. */
+export async function setLineClearedStatus(lineId, { isCleared, clearedDate }) {
+  const line = await prisma.journalEntryLine.findUnique({ where: { id: lineId } });
+  if (!line) throw new ReportServiceError('Journal entry line not found', 404);
+
+  return prisma.journalEntryLine.update({
+    where: { id: lineId },
+    data: {
+      isCleared: !!isCleared,
+      clearedDate: isCleared ? new Date(clearedDate || Date.now()) : null,
+    },
+  });
+}
+
+
 
 /** Profit & Loss for a period: Income accounts minus Expense accounts. */
 export async function profitAndLoss({ from, to } = {}) {
@@ -264,8 +297,21 @@ export async function customerLedger(customerId) {
 }
 
 /** Branch-wise summary — sums posted disbursement/EMI/recovery amounts per branch. */
-export async function branchWiseSummary({ from, to, branchId } = {}) {
-  const branchWhere = branchId ? { branchId } : {};
+export async function branchWiseSummary({ from, to, branchId, branchSearch } = {}) {
+  const searchCondition = branchSearch
+    ? {
+        branch: {
+          OR: [
+            { name: { contains: branchSearch, mode: 'insensitive' } },
+            { code: { contains: branchSearch, mode: 'insensitive' } },
+          ],
+        },
+      }
+    : {};
+  const branchWhere = {
+    ...(branchId ? { branchId } : {}),
+    ...searchCondition,
+  };
 
   const [disbursements, recoveries] = await Promise.all([
     prisma.loanDisbursement.groupBy({
@@ -290,5 +336,28 @@ export async function branchWiseSummary({ from, to, branchId } = {}) {
     }),
   ]);
 
-  return { disbursementsByBranch: disbursements, applicationsByBranch: recoveries };
+  const branchIds = Array.from(
+    new Set([
+      ...disbursements.map((d) => d.branchId),
+      ...recoveries.map((r) => r.branchId),
+    ].filter(Boolean)),
+  );
+  const branches = branchIds.length
+    ? await prisma.branch.findMany({
+        where: { id: { in: branchIds } },
+        select: { id: true, code: true, name: true },
+      })
+    : [];
+  const branchMap = new Map(branches.map((b) => [b.id, b]));
+
+  const attachBranch = (row) => ({
+    ...row,
+    branchCode: branchMap.get(row.branchId)?.code ?? null,
+    branchName: branchMap.get(row.branchId)?.name ?? null,
+  });
+
+  return {
+    disbursementsByBranch: disbursements.map(attachBranch),
+    applicationsByBranch: recoveries.map(attachBranch),
+  };
 }

@@ -51,10 +51,7 @@ export default function Dashboard() {
       {error && (
         <div className="rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <div>{error}</div>
-          <div className="mt-2 text-xs text-red-600">
-            Is the API running? Check VITE_API_URL / that the backend is started
-            (see README).
-          </div>
+
         </div>
       )}
 

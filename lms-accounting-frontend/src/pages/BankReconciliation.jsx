@@ -23,9 +23,15 @@ export default function BankReconciliation() {
       .catch((e) => setError(e.message));
   }, []);
 
-  async function loadReport() {
+  async function loadReport({ resetPage = true, preserveReport = false } = {}) {
     setError("");
-    setReport(null);    setPage(1);
+    if (!preserveReport) {
+      setReport(null);
+    }
+    if (resetPage) {
+      setPage(1);
+    }
+
     if (!accountId || !statementDate || bankBalance === "") {
       setError(
         "Please select an account, statement date, and bank statement balance.",
@@ -51,7 +57,10 @@ export default function BankReconciliation() {
   }
 
   const reportRows = report?.rows ?? [];
-  const currentRows = reportRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const currentRows = reportRows.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
 
   return (
     <div className="space-y-6">
@@ -273,11 +282,17 @@ export default function BankReconciliation() {
                         <th className="px-4 py-3 text-right font-semibold">
                           Balance
                         </th>
+                        <th className="px-4 py-3 text-center font-semibold">
+                          Cleared
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white text-slate-800">
-                      {currentRows.map((row, index) => (
-                        <tr key={index} className="odd:bg-white even:bg-slate-50">
+                      {currentRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="odd:bg-white even:bg-slate-50"
+                        >
                           <td className="whitespace-nowrap px-4 py-3">
                             {shortDate(row.date)}
                           </td>
@@ -294,13 +309,34 @@ export default function BankReconciliation() {
                           <td className="whitespace-nowrap px-4 py-3 text-right">
                             {money(row.runningBalance)}
                           </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={row.isCleared}
+                              onChange={async (e) => {
+                                await api.setLineCleared(row.id, {
+                                  isCleared: e.target.checked,
+                                  clearedDate: e.target.checked
+                                    ? new Date().toISOString()
+                                    : null,
+                                });
+                                loadReport(); // refresh totals after toggling
+                              }}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 {reportRows.length > PAGE_SIZE && (
-                  <Pagination page={page} pageSize={PAGE_SIZE} total={reportRows.length} onPageChange={setPage} />
+                  <Pagination
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    total={reportRows.length}
+                    onPageChange={setPage}
+                  />
                 )}
               </>
             )}

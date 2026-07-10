@@ -116,6 +116,7 @@ export const branchWise = asyncHandler(async (req, res) => {
       from: req.query.from,
       to: req.query.to,
       branchId: req.query.branchId,
+      branchSearch: req.query.branchSearch,
     }),
   );
 });

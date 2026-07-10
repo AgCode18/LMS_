@@ -16,6 +16,7 @@ router.get('/customer-ledger/:customerId', ctrl.customerLedger);
 router.get('/branch-wise', ctrl.branchWise);
 router.get('/reconciliation', reconciliationController.getReconciliation);
 router.get('/reconciliation/export', reconciliationController.exportReconciliation);
+router.patch('/reconciliation/lines/:lineId/clear', reconciliationController.setLineCleared);
 router.post('/reconciliation', reconciliationController.createReconciliationReport);
 
 export default router;

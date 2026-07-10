@@ -46,10 +46,10 @@ function EligibilityPanel() {
       <div className="text-lg font-semibold text-slate-900 mb-4">
         1 · Check disbursement eligibility
       </div>
-      <p className="text-sm leading-6 text-slate-600 mb-6">
+      {/* <p className="text-sm leading-6 text-slate-600 mb-6">
         Verifies KYC = VERIFIED, latest Sanction = APPROVED, latest NACH = ACTIVE,
         and that this loan isn't already disbursed — before any money moves.
-      </p>
+      </p> */}
       <div className="grid gap-4 lg:grid-cols-[2fr_auto]">
         <div>
           <label className="block text-sm font-medium text-slate-600">
@@ -63,7 +63,11 @@ function EligibilityPanel() {
           />
         </div>
         <div className="flex items-end">
-          <button type="submit" className={buttonClass} disabled={busy || !loanApplicationId}>
+          <button
+            type="submit"
+            className={buttonClass}
+            disabled={busy || !loanApplicationId}
+          >
             {busy ? "Checking…" : "Check"}
           </button>
         </div>
@@ -71,7 +75,11 @@ function EligibilityPanel() {
       {error && <Banner type="error">{error}</Banner>}
       {check && (
         <Banner type={check.eligible ? "success" : "error"}>
-          <div>{check.eligible ? "✓ Eligible for disbursement." : "✗ Not eligible yet:"}</div>
+          <div>
+            {check.eligible
+              ? "✓ Eligible for disbursement."
+              : "✗ Not eligible yet:"}
+          </div>
           {!check.eligible && (
             <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-700">
               {check.reasons.map((r) => (
@@ -106,7 +114,9 @@ function DisburseForm() {
     try {
       setResult(await api.disburseLoan(loanApplicationId, fields));
     } catch (err) {
-      setError(err.message + (err.details ? ": " + err.details.join("; ") : ""));
+      setError(
+        err.message + (err.details ? ": " + err.details.join("; ") : ""),
+      );
     } finally {
       setBusy(false);
     }
@@ -118,11 +128,13 @@ function DisburseForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        2 · Disburse (creates LoanDisbursement + journal entry, automatically)
+        2 · Disburse a loan
       </div>
       <div className="grid gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Loan application id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Loan application id
+          </label>
           <input
             required
             value={loanApplicationId}
@@ -132,46 +144,74 @@ function DisburseForm() {
         </div>
         <div className="grid gap-4 lg:grid-cols-5">
           <div>
-            <label className="block text-sm font-medium text-slate-600">Mode</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Mode
+            </label>
             <select
               value={fields.disbursementMode}
-              onChange={(e) => setFields({ ...fields, disbursementMode: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, disbursementMode: e.target.value })
+              }
               className={selectClass}
             >
-              {["NEFT", "RTGS", "IMPS", "BANK_TRANSFER", "CHEQUE", "CASH", "UPI"].map((m) => (
+              {[
+                "NEFT",
+                "RTGS",
+                "IMPS",
+                "BANK_TRANSFER",
+                "CHEQUE",
+                "CASH",
+                "UPI",
+              ].map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">Bank name</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Bank name
+            </label>
             <input
               value={fields.bankName}
-              onChange={(e) => setFields({ ...fields, bankName: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, bankName: e.target.value })
+              }
               className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">Account no.</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Account no.
+            </label>
             <input
               value={fields.bankAccountNumber}
-              onChange={(e) => setFields({ ...fields, bankAccountNumber: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, bankAccountNumber: e.target.value })
+              }
               className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">IFSC</label>
+            <label className="block text-sm font-medium text-slate-600">
+              IFSC
+            </label>
             <input
               value={fields.ifscCode}
-              onChange={(e) => setFields({ ...fields, ifscCode: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, ifscCode: e.target.value })
+              }
               className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">Holder name</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Holder name
+            </label>
             <input
               value={fields.accountHolderName}
-              onChange={(e) => setFields({ ...fields, accountHolderName: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, accountHolderName: e.target.value })
+              }
               className={inputClass}
             />
           </div>
@@ -185,10 +225,15 @@ function DisburseForm() {
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Disbursed {money(result.disbursement.amount)} — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span> was posted automatically.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Disbursed {money(result.disbursement.amount)} — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>{" "}
+          was posted automatically.{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -199,7 +244,11 @@ function DisburseForm() {
 
 function EmiCollectForm() {
   const [emiScheduleId, setEmiScheduleId] = useState("");
-  const [fields, setFields] = useState({ principalAmount: "", interestAmount: "", paymentMode: "UPI" });
+  const [fields, setFields] = useState({
+    principalAmount: "",
+    interestAmount: "",
+    paymentMode: "UPI",
+  });
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -229,11 +278,13 @@ function EmiCollectForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        3 · Collect an EMI (creates EmiPayment + journal entry, automatically)
+        3 · Collect an EMI
       </div>
       <div className="grid gap-4">
         <div>
-          <label className="block text-sm font-medium text-slate-600">EMI schedule id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            EMI schedule id
+          </label>
           <input
             required
             value={emiScheduleId}
@@ -243,30 +294,42 @@ function EmiCollectForm() {
         </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
-            <label className="block text-sm font-medium text-slate-600">Principal</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Principal
+            </label>
             <input
               type="number"
               step="0.01"
               value={fields.principalAmount}
-              onChange={(e) => setFields({ ...fields, principalAmount: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, principalAmount: e.target.value })
+              }
               className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">Interest</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Interest
+            </label>
             <input
               type="number"
               step="0.01"
               value={fields.interestAmount}
-              onChange={(e) => setFields({ ...fields, interestAmount: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, interestAmount: e.target.value })
+              }
               className={inputClass}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600">Payment mode</label>
+            <label className="block text-sm font-medium text-slate-600">
+              Payment mode
+            </label>
             <select
               value={fields.paymentMode}
-              onChange={(e) => setFields({ ...fields, paymentMode: e.target.value })}
+              onChange={(e) =>
+                setFields({ ...fields, paymentMode: e.target.value })
+              }
               className={selectClass}
             >
               {["UPI", "CASH", "BANK", "CHEQUE"].map((m) => (
@@ -284,10 +347,15 @@ function EmiCollectForm() {
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Collected — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span> was posted automatically.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Collected — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>{" "}
+          was posted automatically.{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -329,11 +397,13 @@ function ProcessingFeeForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        4 · Charge processing fee (Dr Bank/Customer Receivable · Cr Processing Fee Income)
+        Charge processing fee
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr_1fr_auto] items-end">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Loan application id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Loan application id
+          </label>
           <input
             required
             value={loanApplicationId}
@@ -342,7 +412,9 @@ function ProcessingFeeForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Amount</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Amount
+          </label>
           <input
             required
             type="number"
@@ -368,15 +440,21 @@ function ProcessingFeeForm() {
         </div>
       </div>
       <p className="text-sm leading-6 text-slate-600">
-        Uncheck "Collected now" if the fee is only receivable (books it against Customer Receivable instead of Bank).
+        Uncheck "Collected now" if the fee is only receivable (books it against
+        Customer Receivable instead of Bank).
       </p>
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Fee posted — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span>.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Fee posted — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>
+          .{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -398,7 +476,11 @@ function PenaltyForm() {
     setError("");
     setResult(null);
     try {
-      setResult(await api.collectPenaltyReal(loanApplicationId, { amount: Number(amount) }));
+      setResult(
+        await api.collectPenaltyReal(loanApplicationId, {
+          amount: Number(amount),
+        }),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -412,11 +494,13 @@ function PenaltyForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        5 · Collect a standalone penalty (Dr Bank · Cr Penalty Income)
+        Collect penalty
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr_auto] items-end">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Loan application id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Loan application id
+          </label>
           <input
             required
             value={loanApplicationId}
@@ -425,7 +509,9 @@ function PenaltyForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Amount</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Amount
+          </label>
           <input
             required
             type="number"
@@ -444,10 +530,15 @@ function PenaltyForm() {
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Penalty posted — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span>.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Penalty posted — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>
+          .{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -465,12 +556,19 @@ function WriteOffForm() {
 
   async function submit(e) {
     e.preventDefault();
-    if (!window.confirm("Write off this loan? This marks it WRITTEN_OFF and cannot be easily undone.")) return;
+    if (
+      !window.confirm(
+        "Write off this loan? This marks it WRITTEN_OFF and cannot be easily undone.",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     setResult(null);
     try {
-      setResult(await api.writeOffReal(loanApplicationId, { amount: Number(amount) }));
+      setResult(
+        await api.writeOffReal(loanApplicationId, { amount: Number(amount) }),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -484,11 +582,13 @@ function WriteOffForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        6 · Write off a loan (Dr Bad Debt Expense · Cr Loan Receivable)
+        Write off a loan
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr_auto] items-end">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Loan application id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Loan application id
+          </label>
           <input
             required
             value={loanApplicationId}
@@ -497,7 +597,9 @@ function WriteOffForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Outstanding amount</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Outstanding amount
+          </label>
           <input
             required
             type="number"
@@ -518,15 +620,21 @@ function WriteOffForm() {
         </div>
       </div>
       <p className="text-sm leading-6 text-slate-600">
-        Sets LoanApplication.status to WRITTEN_OFF and posts the bad-debt entry. Confirmed before submitting.
+        Sets LoanApplication.status to WRITTEN_OFF and posts the bad-debt entry.
+        Confirmed before submitting.
       </p>
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Written off — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span>.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Written off — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>
+          .{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -550,7 +658,13 @@ function RecoveryPaymentForm() {
     setError("");
     setResult(null);
     try {
-      setResult(await api.recoveryPaymentReal(loanRecoveryId, { amount: Number(amount), paymentMode, referenceNo }));
+      setResult(
+        await api.recoveryPaymentReal(loanRecoveryId, {
+          amount: Number(amount),
+          paymentMode,
+          referenceNo,
+        }),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -564,11 +678,13 @@ function RecoveryPaymentForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        7 · Record a recovery payment (Dr Bank · Cr Loan Receivable)
+        Record a recovery payment
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] items-end">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Loan recovery id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Loan recovery id
+          </label>
           <input
             required
             value={loanRecoveryId}
@@ -578,7 +694,9 @@ function RecoveryPaymentForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Amount</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Amount
+          </label>
           <input
             required
             type="number"
@@ -589,7 +707,9 @@ function RecoveryPaymentForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Payment mode</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Payment mode
+          </label>
           <select
             value={paymentMode}
             onChange={(e) => setPaymentMode(e.target.value)}
@@ -601,7 +721,9 @@ function RecoveryPaymentForm() {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Reference no.</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Reference no.
+          </label>
           <input
             value={referenceNo}
             onChange={(e) => setReferenceNo(e.target.value)}
@@ -616,15 +738,21 @@ function RecoveryPaymentForm() {
         </div>
       </div>
       <p className="text-sm leading-6 text-slate-600">
-        Rejects if the amount exceeds the recovery&apos;s outstanding balance. Updates `LoanRecovery.recoveredAmount`/`balanceAmount`.
+        Rejects if the amount exceeds the recovery&apos;s outstanding balance.
+        Updates `LoanRecovery.recoveredAmount`/`balanceAmount`.
       </p>
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Recovery recorded — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span>.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Recovery recorded — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>
+          .{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -647,7 +775,9 @@ function RefundForm() {
     setError("");
     setResult(null);
     try {
-      setResult(await api.refundReal({ referenceId, amount: Number(amount), reason }));
+      setResult(
+        await api.refundReal({ referenceId, amount: Number(amount), reason }),
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -661,11 +791,13 @@ function RefundForm() {
       className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm mb-6"
     >
       <div className="text-lg font-semibold text-slate-900 mb-4">
-        8 · Issue a refund (reverses a prior receipt)
+        Issue a refund
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr_2fr_auto] items-end">
         <div>
-          <label className="block text-sm font-medium text-slate-600">Reference id</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Reference id
+          </label>
           <input
             required
             value={referenceId}
@@ -675,7 +807,9 @@ function RefundForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Amount</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Amount
+          </label>
           <input
             required
             type="number"
@@ -686,7 +820,9 @@ function RefundForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-600">Reason</label>
+          <label className="block text-sm font-medium text-slate-600">
+            Reason
+          </label>
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -703,10 +839,15 @@ function RefundForm() {
       {error && <Banner type="error">{error}</Banner>}
       {result && (
         <Banner type="success">
-          Refund posted — journal voucher{' '}
-          <span className="font-mono text-slate-700">{result.journalEntry.voucherNo}</span>.
-          {' '}
-          <Link to={`/journal-entries/${result.journalEntry.id}`} className="font-semibold text-slate-900 hover:text-slate-700">
+          Refund posted — journal voucher{" "}
+          <span className="font-mono text-slate-700">
+            {result.journalEntry.voucherNo}
+          </span>
+          .{" "}
+          <Link
+            to={`/journal-entries/${result.journalEntry.id}`}
+            className="font-semibold text-slate-900 hover:text-slate-700"
+          >
             View entry →
           </Link>
         </Banner>
@@ -719,9 +860,9 @@ export default function LoanWorkflow() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Loan lifecycle · real controllers"
+        // eyebrow="Loan lifecycle · real controllers"
         title="Loan Lifecycle Workflow"
-        description="The actual gated workflow, not raw accounting triggers: disbursement checks KYC/Sanction/NACH before it will move money, and every step here creates its own LMS record before handing off to the accounting engine automatically."
+        // description="The actual gated workflow, not raw accounting triggers: disbursement checks KYC/Sanction/NACH before it will move money, and every step here creates its own LMS record before handing off to the accounting engine automatically."
       />
       <EligibilityPanel />
       <DisburseForm />

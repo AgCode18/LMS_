@@ -1,7 +1,6 @@
 import prisma from '../lib/prisma.js';
-import { bankReconciliation } from '../services/reportService.js';
+import { bankReconciliation, setLineClearedStatus } from '../services/reportService.js';
 import { toPdfBuffer, toXlsxBuffer } from '../services/exportService.js';
-
 const sendExport = async (res, format, filenameBase, title, columns, rows, subtitle) => {
   if (format === 'pdf') {
     const buffer = await toPdfBuffer(title, columns, rows, { subtitle });
@@ -17,15 +16,14 @@ const sendExport = async (res, format, filenameBase, title, columns, rows, subti
 };
 
 export const reconciliationController = {
-  // Get reconciliation data
   async getReconciliation(req, res, next) {
     try {
       const {
         accountId,
         statementDate,
         bankBalance,
-        fromDate,
-        toDate,
+        from,
+        to,
       } = req.query;
 
       if (!accountId || !statementDate || bankBalance === undefined) {
@@ -37,8 +35,8 @@ export const reconciliationController = {
 
       const data = await bankReconciliation(accountId, {
         statementDate,
-        from: fromDate,
-        to: toDate,
+        from,
+        to,
       });
 
       const adjustedBankBalance = Number(bankBalance) + data.depositsInTransit - data.outstandingChecks;
@@ -70,6 +68,7 @@ export const reconciliationController = {
           isReconciled,
           discrepancies,
           rows: data.rows,
+          netAdjustment: data.netAdjustment,
           reconciliationSummary: {
             totalUnclearedDebits: data.depositsInTransit,
             totalUnclearedCredits: data.outstandingChecks,
@@ -88,8 +87,8 @@ export const reconciliationController = {
         accountId,
         statementDate,
         bankBalance,
-        fromDate,
-        toDate,
+        from,
+        to,
         format,
       } = req.query;
 
@@ -102,8 +101,8 @@ export const reconciliationController = {
 
       const data = await bankReconciliation(accountId, {
         statementDate,
-        from: fromDate,
-        to: toDate,
+        from,
+        to,
       });
 
       const rows = data.rows.map((row) => ({
@@ -113,6 +112,7 @@ export const reconciliationController = {
         debit: row.debit,
         credit: row.credit,
         runningBalance: row.runningBalance,
+        cleared: row.isCleared ? 'Yes' : 'No',
         depositInTransit: row.isDepositInTransit ? 'Yes' : 'No',
         outstandingCheck: row.isOutstandingCheck ? 'Yes' : 'No',
       }));
@@ -124,6 +124,7 @@ export const reconciliationController = {
         { key: 'debit', header: 'Debit', numeric: true },
         { key: 'credit', header: 'Credit', numeric: true },
         { key: 'runningBalance', header: 'Balance', numeric: true },
+        { key: 'cleared', header: 'Cleared' },
         { key: 'depositInTransit', header: 'Deposit In Transit' },
         { key: 'outstandingCheck', header: 'Outstanding Check' },
       ];
@@ -137,59 +138,61 @@ export const reconciliationController = {
     }
   },
 
-  // Create reconciliation report
+  // Mark / unmark a single journal entry line as cleared by the bank
+  async setLineCleared(req, res, next) {
+    try {
+      const { lineId } = req.params;
+      const { isCleared, clearedDate } = req.body;
+
+      if (typeof isCleared !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'isCleared (boolean) is required in the request body',
+        });
+      }
+
+      const updated = await setLineClearedStatus(lineId, { isCleared, clearedDate });
+
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async createReconciliationReport(req, res, next) {
     try {
-      const {
-        accountId,
-        statementDate,
-        bankBalance,
-        reconcilingItems
-      } = req.body;
+      const { accountId, statementDate, bankBalance, reconcilingItems } = req.body;
 
-      // Validate input
       if (!accountId || !statementDate || bankBalance === undefined) {
         return res.status(400).json({
           success: false,
-          message: 'accountId, statementDate, and bankBalance are required'
+          message: 'accountId, statementDate, and bankBalance are required',
         });
       }
 
-      // Get account details
-      const account = await prisma.account.findUnique({
-        where: { id: accountId }
-      });
-
+      const account = await prisma.account.findUnique({ where: { id: accountId } });
       if (!account) {
-        return res.status(404).json({
-          success: false,
-          message: 'Account not found'
-        });
+        return res.status(404).json({ success: false, message: 'Account not found' });
       }
 
-      // Generate report
       const report = {
         reportId: `REC-${Date.now()}`,
-        account: {
-          id: account.id,
-          code: account.code,
-          name: account.name
-        },
+        account: { id: account.id, code: account.code, name: account.name },
         statementDate: new Date(statementDate),
         bankStatementBalance: Number(bankBalance),
         bookBalance: account.currentBalance,
         reconcilingItems: reconcilingItems || [],
         reconciledAt: new Date(),
-        status: 'RECONCILED'
+        status: 'RECONCILED',
       };
 
       res.status(201).json({
         success: true,
         data: report,
-        message: 'Reconciliation report generated successfully'
+        message: 'Reconciliation report generated successfully',
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 };

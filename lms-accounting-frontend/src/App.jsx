@@ -36,7 +36,7 @@ export default function App() {
             <Route path="/reports/reconciliation" element={<BankReconciliation />} />
             <Route path="/reports/customer-ledger" element={<CustomerLedger />} />
             <Route path="/reports/branch-wise" element={<BranchWise />} />
-            <Route path="/simulate" element={<SimulateEvents />} />
+            {/* <Route path="/simulate" element={<SimulateEvents />} /> */}
             <Route path="/loan-workflow" element={<LoanWorkflow />} />
           </Routes>
         </main>

@@ -53,7 +53,6 @@ async function downloadFile(path, params, fallbackFilename) {
   a.remove();
   window.URL.revokeObjectURL(objectUrl);
 }
-
 export const api = {
   // Accounts / COA
   getAccountTree: () => request("/accounts/tree"),
@@ -132,6 +131,11 @@ export const api = {
       { accountId, format, ...params },
       `bank-reconciliation.${format}`,
     ),
+  setLineCleared: (lineId, body) =>
+    request(`/reports/reconciliation/lines/${lineId}/clear`, {
+      method: "PATCH",
+      body,
+    }),
 
   // Report exports (xlsx / pdf)
   exportTrialBalance: (format, params) =>

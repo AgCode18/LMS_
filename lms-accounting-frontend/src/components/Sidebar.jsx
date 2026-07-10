@@ -28,10 +28,10 @@ const LINKS = [
       { to: "/loan-workflow", label: "Full Lifecycle Workflow", idx: "10" },
     ],
   },
-  {
-    group: "LMS Event Simulator",
-    items: [{ to: "/simulate", label: "Raw Posting Triggers", idx: "11" }],
-  },
+  // {
+  //   group: "LMS Event Simulator",
+  //   items: [{ to: "/simulate", label: "Raw Posting Triggers", idx: "11" }],
+  // },
 ];
 
 const baseLinkClass = "group flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-medium text-slate-700 ";
@@ -42,9 +42,9 @@ export default function Sidebar() {
     <aside className="space-y-8 rounded-4xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="space-y-2">
         <div className="text-2xl font-semibold tracking-tight text-slate-900">
-          Ledger
+          {/* Ledger */}
         </div>
-        <div className="text-sm text-slate-500">Accounting </div>
+        {/* <div className="text-sm text-slate-500">Accounting </div> */}
       </div>
 
       <div className="space-y-8">
@@ -58,7 +58,7 @@ export default function Sidebar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  end={item.to === "/"}
+                  end
                   className={({ isActive }) =>
                     `${baseLinkClass} ${isActive ? activeLinkClass : "bg-slate-50"}`
                   }

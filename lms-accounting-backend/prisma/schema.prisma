@@ -1,6 +1,6 @@
 datasource db {
   provider = "mysql"
-  // url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -356,14 +356,12 @@ model JournalEntryLine {
   credit         Float        @default(0)
   description    String?
   createdAt      DateTime     @default(now())
+  isCleared      Boolean      @default(false)
+  clearedDate    DateTime?
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
   account        Account      @relation(fields: [accountId], references: [id])
 
   @@index([journalEntryId])
   @@index([accountId])
+  @@index([accountId, isCleared])
 }
-
-
-// bank reconcilation statement model for accounting engine
-
-
