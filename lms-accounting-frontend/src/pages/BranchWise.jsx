@@ -7,7 +7,7 @@ import { money } from '../utils/format.js';
 export default function BranchWise() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [branches, setBranches] = useState([]);
+  const [ branches, setBranches] = useState([]);
   const [branchId, setBranchId] = useState('');
   const [branchSearch, setBranchSearch] = useState('');
   const [showBranchForm, setShowBranchForm] = useState(false);
@@ -47,6 +47,19 @@ export default function BranchWise() {
     loadBranches();
     load();
   }, []);
+
+  // Live-search: when the user types in the branch search box, run the
+  // search after a short debounce so results update without pressing Apply.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // reset paging and reload
+      setDisbursementsPage(1);
+      setApplicationsPage(1);
+      load();
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchSearch]);
 
   const disbursementRows = data?.disbursementsByBranch ?? [];
   const applicationRows = data?.applicationsByBranch ?? [];

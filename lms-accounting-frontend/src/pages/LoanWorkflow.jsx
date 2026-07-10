@@ -4,11 +4,9 @@ import { api } from "../api/client.js";
 import PageHeader from "../components/PageHeader.jsx";
 import { money } from "../utils/format.js";
 
-const inputClass =
-  "mt-2 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200";
+const inputClass = "mt-2 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200";
 const selectClass = inputClass;
-const buttonClass =
-  "inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed";
+const buttonClass = "inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed";
 
 function Banner({ type, children }) {
   const style =

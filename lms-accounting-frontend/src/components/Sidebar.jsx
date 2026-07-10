@@ -22,12 +22,12 @@ const LINKS = [
       { to: "/reports/branch-wise", label: "Branch-wise Summary", idx: "10" },
     ],
   },
-  {
-    group: "Loan Lifecycle",
-    items: [
-      { to: "/loan-workflow", label: "Full Lifecycle Workflow", idx: "10" },
-    ],
-  },
+  // {
+  //   group: "Loan Lifecycle",
+  //   items: [
+  //     { to: "/loan-workflow", label: "Full Lifecycle Workflow", idx: "10" },
+  //   ],
+  // },
   // {
   //   group: "LMS Event Simulator",
   //   items: [{ to: "/simulate", label: "Raw Posting Triggers", idx: "11" }],

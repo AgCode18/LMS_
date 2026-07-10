@@ -295,8 +295,11 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
     ? {
         branch: {
           OR: [
-            { name: { contains: branchSearch, mode: 'insensitive' } },
-            { code: { contains: branchSearch, mode: 'insensitive' } },
+            // Some Prisma clients/environments may not support the `mode` option
+            // on string filters. Use a plain `contains` filter which is widely
+            // supported; keep searches simple and explicit.
+            { name: { contains: branchSearch } },
+            { code: { contains: branchSearch } },
           ],
         },
       }
@@ -306,28 +309,40 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
     ...searchCondition,
   };
 
-  const [disbursements, recoveries] = await Promise.all([
-    prisma.loanDisbursement.groupBy({
-      by: ['branchId'],
-      where: {
-        accountingStatus: 'POSTED',
-        ...branchWhere,
-        ...((from || to) && {
-          disbursementDate: {
-            ...(from && { gte: new Date(from) }),
-            ...(to && { lte: new Date(to) }),
-          },
-        }),
-      },
-      _sum: { amount: true },
-      _count: { _all: true },
-    }),
-    prisma.loanApplication.groupBy({
-      by: ['branchId'],
-      where: branchWhere,
-      _count: { _all: true },
-    }),
-  ]);
+  let disbursements;
+  let recoveries;
+  try {
+    [disbursements, recoveries] = await Promise.all([
+      prisma.loanDisbursement.groupBy({
+        by: ['branchId'],
+        where: {
+          accountingStatus: 'POSTED',
+          ...branchWhere,
+          ...((from || to) && {
+            disbursementDate: {
+              ...(from && { gte: new Date(from) }),
+              ...(to && { lte: new Date(to) }),
+            },
+          }),
+        },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      prisma.loanApplication.groupBy({
+        by: ['branchId'],
+        where: branchWhere,
+        _count: { _all: true },
+      }),
+    ]);
+  } catch (err) {
+    // Provide a clearer, actionable error to the API consumer instead of
+    // forwarding the raw Prisma error which can be confusing or leak
+    // implementation details.
+    throw new ReportServiceError(
+      'Branch search failed: invalid search parameter or unsupported database feature. Try a simpler search term.',
+      400,
+    );
+  }
 
   const branchIds = Array.from(
     new Set([

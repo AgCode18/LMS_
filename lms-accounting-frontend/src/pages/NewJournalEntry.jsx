@@ -142,7 +142,7 @@ export default function NewJournalEntry() {
 
   return (
     <>
-      <PageHeader title="New Journal Entry" />
+      <PageHeader title="New Journal Voucher" />
 
       {error && <Banner type="error">{error}</Banner>}
 
