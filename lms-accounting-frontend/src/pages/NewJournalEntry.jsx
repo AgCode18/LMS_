@@ -11,6 +11,16 @@ const emptyLine = () => ({
   description: "",
 });
 
+function sanitizeAmountInput(value) {
+  if (value === "") return "";
+
+  const normalized = String(value).trim();
+  if (!/^\d*\.?\d*$/.test(normalized)) return "";
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) && numeric >= 0 ? normalized : "";
+}
+
 const inputClass =
   "mt-2 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
 const selectClass = inputClass;
@@ -63,9 +73,45 @@ export default function NewJournalEntry() {
     setLines((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function updateAmount(idx, field, rawValue) {
+    const sanitized = sanitizeAmountInput(rawValue);
+    const nextValue = sanitized === "" ? "" : sanitized;
+
+    setLines((prev) =>
+      prev.map((line, i) => {
+        if (i !== idx) return line;
+
+        if (field === "debit") {
+          return {
+            ...line,
+            debit: nextValue,
+            credit: nextValue ? "" : line.credit,
+          };
+        }
+
+        return {
+          ...line,
+          credit: nextValue,
+          debit: nextValue ? "" : line.debit,
+        };
+      }),
+    );
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    const hasInvalidAmounts = lines.some((line) => {
+      const debit = line.debit === "" ? 0 : Number(line.debit);
+      const credit = line.credit === "" ? 0 : Number(line.credit);
+      return !Number.isFinite(debit) || !Number.isFinite(credit) || debit < 0 || credit < 0;
+    });
+
+    if (hasInvalidAmounts) {
+      setError("Debit and credit amounts must be zero or greater.");
+      return;
+    }
+
     if (!balanced) {
       setError("Debits must equal credits before this voucher can be posted.");
       return;
@@ -170,12 +216,7 @@ export default function NewJournalEntry() {
                     min="0"
                     step="0.01"
                     value={line.debit}
-                    onChange={(e) =>
-                      updateLine(idx, {
-                        debit: e.target.value,
-                        credit: e.target.value ? "" : line.credit,
-                      })
-                    }
+                    onChange={(e) => updateAmount(idx, "debit", e.target.value)}
                     className={inputClass}
                   />
                 </div>
@@ -188,12 +229,7 @@ export default function NewJournalEntry() {
                     min="0"
                     step="0.01"
                     value={line.credit}
-                    onChange={(e) =>
-                      updateLine(idx, {
-                        credit: e.target.value,
-                        debit: e.target.value ? "" : line.debit,
-                      })
-                    }
+                    onChange={(e) => updateAmount(idx, "credit", e.target.value)}
                     className={inputClass}
                   />
                 </div>

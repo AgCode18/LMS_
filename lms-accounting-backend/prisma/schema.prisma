@@ -73,6 +73,7 @@ model LoanApplication {
 // of these (Kyc, Sanction, NachMandate) — same names/enums, so the
 // eligibility check in loanLifecycleService.js works unchanged once
 // merged into your real backend.
+
 model Kyc {
   id         String    @id @default(cuid())
   status     KycStatus @default(PENDING)

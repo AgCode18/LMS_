@@ -244,7 +244,7 @@ export default function BankReconciliation() {
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">
-              From date <span className="text-slate-400">(display only)</span>
+              From date 
             </div>
             <input
               type="date"
@@ -256,7 +256,7 @@ export default function BankReconciliation() {
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">
-              To date <span className="text-slate-400">(display only)</span>
+              To date
             </div>
             <input
               type="date"
@@ -344,9 +344,9 @@ export default function BankReconciliation() {
                         bankBalance,
                       })
                     }
-                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    className="inline-flex h-5 items-center justify-center  border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-900 hover:text-white"
                   >
-                    Export XLSX
+                    XLSX
                   </button>
                   <button
                     type="button"
@@ -356,9 +356,9 @@ export default function BankReconciliation() {
                         bankBalance,
                       })
                     }
-                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+                    className="inline-flex h-5  flex-col items-center justify-center  bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-900 hover:text-white"
                   >
-                    Export PDF
+                    PDF
                   </button>
 
                   {/* <button
