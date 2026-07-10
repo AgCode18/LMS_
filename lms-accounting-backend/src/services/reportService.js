@@ -123,8 +123,7 @@ export async function accountLedger(accountId, { from, to } = {}) {
     rows,
   };
 }
-
-export async function bankReconciliation(accountId, { statementDate, from, to } = {}) {
+export async function bankReconciliation(accountId, { statementDate } = {}) {
   if (!statementDate) {
     throw new ReportServiceError('statementDate is required', 400);
   }
@@ -141,13 +140,16 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
       },
     },
     include: { journalEntry: true },
-    orderBy: { journalEntry: { transactionDate: 'asc' } },
+    orderBy: [
+      { journalEntry: { transactionDate: 'asc' } },
+      { journalEntry: { voucherNo: 'asc' } },
+    ],
   });
 
   let running = account.openingBalance;
   const debitNormal = isDebitNormal(account.type);
 
-  const computedRows = allLines.map((l) => {
+  const rows = allLines.map((l) => {
     running += debitNormal ? l.debit - l.credit : l.credit - l.debit;
     return {
       id: l.id,
@@ -159,25 +161,16 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
       runningBalance: running,
       isCleared: l.isCleared,
       clearedDate: l.clearedDate,
-      // Only uncleared lines are "in transit" / "outstanding" — this is
-      // the actual definition of a reconciling item.
       isDepositInTransit: l.debit > 0 && !l.isCleared,
       isOutstandingCheck: l.credit > 0 && !l.isCleared,
     };
   });
 
-  const filteredRows = computedRows.filter((row) => {
-    const date = new Date(row.date);
-    if (from && date < startOfDay(from)) return false;
-    if (to && date > endOfDay(to)) return false;
-    return true;
-  });
-
-  const depositsInTransit = computedRows
+  const depositsInTransit = rows
     .filter((row) => row.isDepositInTransit)
     .reduce((sum, row) => sum + row.debit, 0);
 
-  const outstandingChecks = computedRows
+  const outstandingChecks = rows
     .filter((row) => row.isOutstandingCheck)
     .reduce((sum, row) => sum + row.credit, 0);
 
@@ -186,7 +179,7 @@ export async function bankReconciliation(accountId, { statementDate, from, to } 
     openingBalance: account.openingBalance,
     bookBalance: running,
     statementDate: new Date(statementDate),
-    rows: filteredRows,
+    rows, // full history — from/to filtering now happens client-side, display-only
     depositsInTransit,
     outstandingChecks,
     netAdjustment: depositsInTransit - outstandingChecks,

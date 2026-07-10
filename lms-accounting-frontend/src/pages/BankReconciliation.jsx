@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client.js";
 import PageHeader from "../components/PageHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -16,6 +16,7 @@ export default function BankReconciliation() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+
   useEffect(() => {
     api
       .getAccounts()
@@ -23,11 +24,9 @@ export default function BankReconciliation() {
       .catch((e) => setError(e.message));
   }, []);
 
-  async function loadReport({ resetPage = true, preserveReport = false } = {}) {
+  async function loadReport({ resetPage = true } = {}) {
     setError("");
-    if (!preserveReport) {
-      setReport(null);
-    }
+    setReport(null);
     if (resetPage) {
       setPage(1);
     }
@@ -41,12 +40,7 @@ export default function BankReconciliation() {
 
     setLoading(true);
     try {
-      const params = {
-        statementDate,
-        bankBalance,
-        from: from || undefined,
-        to: to || undefined,
-      };
+      const params = { statementDate, bankBalance };
       const data = await api.getBankReconciliation(accountId, params);
       setReport(data.data);
     } catch (e) {
@@ -56,18 +50,133 @@ export default function BankReconciliation() {
     }
   }
 
-  const reportRows = report?.rows ?? [];
-  const currentRows = reportRows.slice(
+  // Recomputes totals from the FULL, unfiltered row set — this is always
+  // the source of truth for balances, regardless of what's on-screen.
+  async function handleToggleCleared(rowId, checked) {
+    if (!report) return;
+
+    const previousRows = report.rows;
+    const nextRows = previousRows.map((row) =>
+      row.id === rowId
+        ? {
+            ...row,
+            isCleared: checked,
+            clearedDate: checked ? new Date().toISOString() : null,
+            isDepositInTransit: row.debit > 0 && !checked,
+            isOutstandingCheck: row.credit > 0 && !checked,
+          }
+        : row,
+    );
+
+    const depositsInTransit = nextRows
+      .filter((row) => row.isDepositInTransit)
+      .reduce((sum, row) => sum + row.debit, 0);
+
+    const outstandingChecks = nextRows
+      .filter((row) => row.isOutstandingCheck)
+      .reduce((sum, row) => sum + row.credit, 0);
+
+    const netAdjustment = depositsInTransit - outstandingChecks;
+    const adjustedBankBalance = Number(bankBalance) + netAdjustment;
+    const isReconciled =
+      Math.abs(adjustedBankBalance - report.bookBalance) < 0.001;
+
+    setReport({
+      ...report,
+      rows: nextRows,
+      depositsInTransit,
+      outstandingChecks,
+      netAdjustment,
+      adjustedBankBalance,
+      isReconciled,
+    });
+
+    try {
+      await api.setLineCleared(rowId, {
+        isCleared: checked,
+        clearedDate: checked ? new Date().toISOString() : null,
+      });
+    } catch (e) {
+      setError(e.message);
+      setReport({ ...report, rows: previousRows });
+    }
+  }
+
+  async function handleToggleAll(checked) {
+    if (!report) return;
+
+    const previousRows = report.rows;
+
+    const nextRows = previousRows.map((row) => ({
+      ...row,
+      isCleared: checked,
+      clearedDate: checked ? new Date().toISOString() : null,
+      isDepositInTransit: row.debit > 0 && !checked,
+      isOutstandingCheck: row.credit > 0 && !checked,
+    }));
+
+    const depositsInTransit = nextRows
+      .filter((row) => row.isDepositInTransit)
+      .reduce((sum, row) => sum + row.debit, 0);
+
+    const outstandingChecks = nextRows
+      .filter((row) => row.isOutstandingCheck)
+      .reduce((sum, row) => sum + row.credit, 0);
+
+    const netAdjustment = depositsInTransit - outstandingChecks;
+    const adjustedBankBalance = Number(bankBalance) + netAdjustment;
+    const isReconciled =
+      Math.abs(adjustedBankBalance - report.bookBalance) < 0.001;
+
+    setReport({
+      ...report,
+      rows: nextRows,
+      depositsInTransit,
+      outstandingChecks,
+      netAdjustment,
+      adjustedBankBalance,
+      isReconciled,
+    });
+
+    try {
+      await Promise.all(
+        nextRows.map((row) =>
+          api.setLineCleared(row.id, {
+            isCleared: checked,
+            clearedDate: checked ? new Date().toISOString() : null,
+          }),
+        ),
+      );
+    } catch (err) {
+      setError(err.message);
+      setReport({
+        ...report,
+        rows: previousRows,
+      });
+    }
+  }
+
+  // Display-only filter — never used for balance math, only for what's
+  // shown in the ledger table below.
+  const visibleRows = useMemo(() => {
+    const rows = report?.rows ?? [];
+    if (!from && !to) return rows;
+    return rows.filter((row) => {
+      const date = new Date(row.date);
+      if (from && date < new Date(from)) return false;
+      if (to && date > new Date(to)) return false;
+      return true;
+    });
+  }, [report, from, to]);
+
+  const currentRows = visibleRows.slice(
     (page - 1) * PAGE_SIZE,
     page * PAGE_SIZE,
   );
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Bank Reconciliation"
-        // description="Compare book balance against bank statement balance for the selected cash account and statement date."
-      />
+      <PageHeader title="Bank Reconciliation" />
 
       {error && (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -109,7 +218,7 @@ export default function BankReconciliation() {
 
           <div>
             <label className="block text-sm font-medium text-slate-600">
-              Bank statement balance
+              Closing balance
             </label>
             <input
               type="number"
@@ -134,7 +243,9 @@ export default function BankReconciliation() {
 
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">From date</div>
+            <div className="text-sm text-slate-500">
+              From date <span className="text-slate-400">(display only)</span>
+            </div>
             <input
               type="date"
               value={from}
@@ -144,7 +255,9 @@ export default function BankReconciliation() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">To date</div>
+            <div className="text-sm text-slate-500">
+              To date <span className="text-slate-400">(display only)</span>
+            </div>
             <input
               type="date"
               value={to}
@@ -161,7 +274,7 @@ export default function BankReconciliation() {
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">Bank balance</div>
+            <div className="text-sm text-slate-500">Closing balance</div>
             <div className="mt-2 text-base font-semibold text-slate-900">
               {bankBalance !== "" ? money(Number(bankBalance)) : "—"}
             </div>
@@ -213,7 +326,9 @@ export default function BankReconciliation() {
                   Ledger activity
                 </div>
                 <div className="text-sm text-slate-500">
-                  Transactions matching your selected account and date range.
+                  All posted transactions up to the statement date. From/To only
+                  filters what's shown below — totals above always reflect the
+                  full account history.
                 </div>
               </div>
               <div className="flex flex-col items-start gap-3 sm:items-end">
@@ -227,8 +342,6 @@ export default function BankReconciliation() {
                       api.exportBankReconciliation(accountId, "xlsx", {
                         statementDate,
                         bankBalance,
-                        from: from || undefined,
-                        to: to || undefined,
                       })
                     }
                     className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -241,19 +354,33 @@ export default function BankReconciliation() {
                       api.exportBankReconciliation(accountId, "pdf", {
                         statementDate,
                         bankBalance,
-                        from: from || undefined,
-                        to: to || undefined,
                       })
                     }
                     className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
                   >
                     Export PDF
                   </button>
+
+                  {/* <button
+                    type="button"
+                    onClick={() => handleToggleAll(true)}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
+                  >
+                    Check All
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAll(false)}
+                    className="rounded-xl bg-slate-600 px-4 py-2 text-white hover:bg-slate-700"
+                  >
+                    Uncheck All
+                  </button> */}
                 </div>
               </div>
             </div>
 
-            {report.rows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
                 No posted transactions found for the selected account and date
                 range.
@@ -283,7 +410,19 @@ export default function BankReconciliation() {
                           Balance
                         </th>
                         <th className="px-4 py-3 text-center font-semibold">
-                          Cleared
+                          <div className="flex items-center justify-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={
+                                report.rows.length > 0 &&
+                                report.rows.every((r) => r.isCleared)
+                              }
+                              onChange={(e) =>
+                                handleToggleAll(e.target.checked)
+                              }
+                            />
+                            {/* <span>All</span> */}
+                          </div>
                         </th>
                       </tr>
                     </thead>
@@ -313,15 +452,9 @@ export default function BankReconciliation() {
                             <input
                               type="checkbox"
                               checked={row.isCleared}
-                              onChange={async (e) => {
-                                await api.setLineCleared(row.id, {
-                                  isCleared: e.target.checked,
-                                  clearedDate: e.target.checked
-                                    ? new Date().toISOString()
-                                    : null,
-                                });
-                                loadReport(); // refresh totals after toggling
-                              }}
+                              onChange={(e) =>
+                                handleToggleCleared(row.id, e.target.checked)
+                              }
                               className="h-4 w-4 rounded border-slate-300"
                             />
                           </td>
@@ -330,11 +463,11 @@ export default function BankReconciliation() {
                     </tbody>
                   </table>
                 </div>
-                {reportRows.length > PAGE_SIZE && (
+                {visibleRows.length > PAGE_SIZE && (
                   <Pagination
                     page={page}
                     pageSize={PAGE_SIZE}
-                    total={reportRows.length}
+                    total={visibleRows.length}
                     onPageChange={setPage}
                   />
                 )}
