@@ -1,11 +1,13 @@
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
+
+datasource db {
+  provider = "mysql"
+}
+
+
 
 // =====================================================================
 // NOTE: This is a TRIMMED-DOWN copy of your real LMS schema, kept only

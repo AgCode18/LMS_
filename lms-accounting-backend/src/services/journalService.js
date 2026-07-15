@@ -162,3 +162,119 @@ export async function getJournalEntry(id) {
   if (!entry) throw new JournalServiceError('Journal entry not found', 404);
   return entry;
 }
+
+
+
+
+
+// typescript code  👇👇
+
+
+
+
+// import { Prisma } from "@prisma/client";
+// import prisma from '../lib/prisma.js';
+// import { nextVoucherNumber } from '../utils/voucherNumber.js';
+// import { applyMovement } from './accountService.js';
+
+// export class JournalServiceError extends Error {
+//   public status: number;
+  
+//   constructor(message: string, status: number = 400) {
+//     super(message);
+//     this.name = 'JournalServiceError';
+//     this.status = status;
+//     Object.setPrototypeOf(this, JournalServiceError.prototype);
+//   }
+// }
+
+// const EPSILON = 0.005;
+
+// type JournalStatus = 'DRAFT' | 'POSTED' | 'CANCELLED';
+// type JournalLineInput = {
+//   accountId: string;
+//   debit?: number;
+//   credit?: number;
+//   description?: string | null;
+// };
+
+// type CreateJournalInput = {
+//   narration?: string | null;
+//   referenceType?: string | null;
+//   referenceId?: string | null;
+//   lines: JournalLineInput[];
+//   transactionDate?: Date;
+//   createdById?: string | null;
+//   status?: JournalStatus;
+//   loanDisbursementId?: string | null;
+// };
+
+// export async function createJournal({
+//   narration,
+//   referenceType,
+//   referenceId,
+//   lines,
+//   transactionDate = new Date(),
+//   createdById,
+//   status = 'POSTED',
+//   loanDisbursementId,
+// }: CreateJournalInput) {
+//   if (!Array.isArray(lines) || lines.length < 2) {
+//     throw new JournalServiceError('A journal entry needs at least two lines (one debit, one credit)');
+//   }
+
+//   let totalDebit = 0;
+//   let totalCredit = 0;
+//   for (const line of lines) {
+//     if (!line.accountId) throw new JournalServiceError('Every journal line needs an accountId');
+//     totalDebit += Number(line.debit ?? 0);
+//     totalCredit += Number(line.credit ?? 0);
+//   }
+
+//   if (Math.abs(totalDebit - totalCredit) > EPSILON) {
+//     throw new JournalServiceError(
+//       `Journal entry is not balanced: total debit ${totalDebit.toFixed(2)} !== total credit ${totalCredit.toFixed(2)}`
+//     );
+//   }
+//   if (totalDebit === 0) {
+//     throw new JournalServiceError('Journal entry cannot have a zero amount');
+//   }
+
+//   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+//     const voucherNo = await nextVoucherNumber(tx, transactionDate);
+
+//     const entry = await tx.journalEntry.create({
+//       data: {
+//         voucherNo,
+//         voucherType: 'JOURNAL',
+//         transactionDate,
+//         referenceType: referenceType ?? null,
+//         referenceId: referenceId ?? null,
+//         narration: narration ?? null,
+//         totalDebit,
+//         totalCredit,
+//         status,
+//         postedAt: status === 'POSTED' ? new Date() : null,
+//         createdById: createdById ?? null,
+//         loanDisbursementId: loanDisbursementId ?? null,
+//         lines: {
+//           create: lines.map((l) => ({
+//             accountId: l.accountId,
+//             debit: Number(l.debit ?? 0),
+//             credit: Number(l.credit ?? 0),
+//             description: l.description ?? null,
+//           })),
+//         },
+//       },
+//       include: { lines: { include: { account: true } } },
+//     });
+
+//     if (status === 'POSTED') {
+//       for (const line of lines) {
+//         await applyMovement(tx, line.accountId, Number(line.debit ?? 0), Number(line.credit ?? 0));
+//       }
+//     }
+
+//     return entry;
+//   });
+// }

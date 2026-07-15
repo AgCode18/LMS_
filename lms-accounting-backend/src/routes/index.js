@@ -18,3 +18,9 @@ router.use('/loans', loansRoutes);
 router.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 export default router;
+
+
+
+// typescript code 👇👇
+
+

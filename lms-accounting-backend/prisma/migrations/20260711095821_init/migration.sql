@@ -263,9 +263,12 @@ CREATE TABLE `JournalEntryLine` (
     `credit` DOUBLE NOT NULL DEFAULT 0,
     `description` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `isCleared` BOOLEAN NOT NULL DEFAULT false,
+    `clearedDate` DATETIME(3) NULL,
 
     INDEX `JournalEntryLine_journalEntryId_idx`(`journalEntryId`),
     INDEX `JournalEntryLine_accountId_idx`(`accountId`),
+    INDEX `JournalEntryLine_accountId_isCleared_idx`(`accountId`, `isCleared`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
