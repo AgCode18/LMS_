@@ -1,63 +1,36 @@
-import { PrismaClient } from '@prisma/client';
+import "dotenv/config";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaClient } from "../generated/prisma/client.js";
 
-// Reuse a single PrismaClient instance (avoids exhausting DB connections
-// when this module is imported from many services/controllers).
-const prisma = globalThis.__lmsPrisma ?? new PrismaClient();
-if (process.env.NODE_ENV !== 'production') globalThis.__lmsPrisma = prisma;
+const adapter = new PrismaMariaDb({
+  host: process.env.DATABASE_HOST,
+  user: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
+  connectionLimit: 5,
+});
+const prisma = new PrismaClient({ adapter });
 
 export default prisma;
-
 
 
 //  typescript code  👇👇
 
 
-// import { PrismaClient } from '@prisma/client';
 
-// // Extend the global type
-// declare global {
-//   // eslint-disable-next-line no-var
-//   var __lmsPrisma: ExtendedPrismaClient | undefined;
-// }
 
-// // Create a custom extended client
-// class ExtendedPrismaClient extends PrismaClient {
-//   constructor() {
-//     super({
-//       log: process.env.NODE_ENV === 'development' 
-//         ? ['query', 'info', 'warn', 'error'] 
-//         : ['error'],
-//     });
-//   }
+// import "dotenv/config";
+// import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+// import { PrismaClient } from "../generated/prisma/client.js";
 
-//   // Add custom methods here
-//   async findSoftDeleted<T>(model: string, id: string): Promise<T | null> {
-//     // Custom logic for soft deletes
-//     return this[model].findFirst({
-//       where: {
-//         id,
-//         deletedAt: { not: null }
-//       }
-//     }) as Promise<T | null>;
-//   }
+// const adapter = new PrismaMariaDb({
+//   host: process.env.DATABASE_HOST as string,
+//   user: process.env.DATABASE_USER as string,
+//   password: process.env.DATABASE_PASSWORD as string,
+//   database: process.env.DATABASE_NAME as string,
+//   connectionLimit: 5,
+// });
 
-//   // Add health check method
-//   async healthCheck(): Promise<boolean> {
-//     try {
-//       await this.$queryRaw`SELECT 1`;
-//       return true;
-//     } catch (error) {
-//       console.error('Health check failed:', error);
-//       return false;
-//     }
-//   }
-// }
-
-// // Reuse a single PrismaClient instance
-// const prisma: ExtendedPrismaClient = globalThis.__lmsPrisma ?? new ExtendedPrismaClient();
-
-// if (process.env.NODE_ENV !== 'production') {
-//   globalThis.__lmsPrisma = prisma;
-// }
+// const prisma = new PrismaClient({ adapter });
 
 // export default prisma;

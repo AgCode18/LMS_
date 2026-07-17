@@ -202,36 +202,42 @@ export async function applyMovement(tx, accountId, debit, credit) {
 
 
 
+// typscript code 👇👇
 
 
-
-// typescript code  👇👇
-
-
-// import { Prisma, Account, AccountType, AccountStatus } from "@prisma/client";
+// import { Prisma, PrismaClient, Account, AccountType, AccountStatus } from "@prisma/client";
 // import prisma from "../lib/prisma.js";
-// import { PrismaClient } from "@prisma/client";
 
-// // Error class with proper TypeScript types
+// // ============================================================================
+// // Error Class
+// // ============================================================================
+
 // export class AccountServiceError extends Error {
-//   public status: number;
-  
+//   status: number;
+
 //   constructor(message: string, status: number = 400) {
 //     super(message);
 //     this.name = "AccountServiceError";
 //     this.status = status;
-//     Object.setPrototypeOf(this, AccountServiceError.prototype);
 //   }
 // }
 
-// // Type definitions
-// export type AccountTypeUnion = AccountType; // Using Prisma's generated enum
-// export type AccountStatusUnion = AccountStatus; // Using Prisma's generated enum
+// // ============================================================================
+// // Types
+// // ============================================================================
+
+// export interface ListAccountsOptions {
+//   type?: AccountType;
+//   status?: AccountStatus;
+//   search?: string;
+//   page?: number;
+//   pageSize?: number;
+// }
 
 // export interface CreateAccountInput {
-//   name: string;
-//   type: AccountTypeUnion;
 //   code?: string;
+//   name: string;
+//   type: AccountType;
 //   systemKey?: string | null;
 //   parentAccountId?: string | null;
 //   openingBalance?: number;
@@ -241,45 +247,23 @@ export async function applyMovement(tx, accountId, debit, credit) {
 // export interface UpdateAccountInput {
 //   name?: string;
 //   description?: string | null;
-//   status?: AccountStatusUnion;
+//   status?: AccountStatus;
 //   parentAccountId?: string | null;
 // }
 
-// export interface ListAccountsParams {
-//   type?: AccountTypeUnion;
-//   status?: AccountStatusUnion;
-//   search?: string;
-//   page?: number;
-//   pageSize?: number;
-// }
+// // ============================================================================
+// // Constants
+// // ============================================================================
 
-// export interface PaginatedResult<T> {
-//   total: number;
-//   page: number;
-//   pageSize: number;
-//   data: T[];
-// }
+// const DEBIT_NORMAL_TYPES = new Set<AccountType>([
+//   "ASSET",
+//   "EXPENSE",
+// ]);
 
-// export interface AccountWithChildren extends Account {
-//   children: AccountWithChildren[];
-// }
-
-// // Constants with proper typing
-// const DEBIT_NORMAL_TYPES = new Set<AccountTypeUnion>(["ASSET", "EXPENSE"]);
-
-// /**
-//  * Normal balance side per account type — decides whether a debit or a
-//  * credit line INCREASES an account's currentBalance. This is standard
-//  * double-entry accounting, not something specific to loans.
-//  */
-// export const isDebitNormal = (accountType: AccountTypeUnion): boolean =>
+// export const isDebitNormal = (accountType: AccountType): boolean =>
 //   DEBIT_NORMAL_TYPES.has(accountType);
 
-// /**
-//  * ASSET codes start 1xxx, LIABILITY 2xxx, EQUITY 3xxx, INCOME 4xxx, EXPENSE 5xxx —
-//  * matches the PDF's sample Chart of Accounts numbering convention.
-//  */
-// const TYPE_PREFIX: Record<AccountTypeUnion, number> = {
+// const TYPE_PREFIX: Record<AccountType, number> = {
 //   ASSET: 1,
 //   LIABILITY: 2,
 //   EQUITY: 3,
@@ -287,10 +271,15 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //   EXPENSE: 5,
 // };
 
+// // ============================================================================
+// // Generate Next Account Code
+// // ============================================================================
+
 // export async function generateNextCode(
-//   type: AccountTypeUnion
+//   type: AccountType
 // ): Promise<string> {
 //   const prefix = TYPE_PREFIX[type];
+
 //   if (!prefix) {
 //     throw new AccountServiceError(
 //       `Cannot auto-generate a code for unknown account type "${type}"`
@@ -298,37 +287,75 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //   }
 
 //   const candidates = await prisma.account.findMany({
-//     where: { code: { startsWith: String(prefix) } },
-//     select: { code: true },
+//     where: {
+//       code: {
+//         startsWith: String(prefix),
+//       },
+//     },
+//     select: {
+//       code: true,
+//     },
 //   });
 
 //   const nums = candidates
 //     .map(({ code }) => Number(code))
-//     .filter((n) => Number.isFinite(n) && Math.floor(n / 1000) === prefix);
+//     .filter(
+//       (n) => Number.isFinite(n) && Math.floor(n / 1000) === prefix
+//     );
 
-//   const next = nums.length ? Math.max(...nums) + 1 : prefix * 1000 + 1;
+//   const next = nums.length
+//     ? Math.max(...nums) + 1
+//     : prefix * 1000 + 1;
+
 //   return String(next);
 // }
 
+// // ============================================================================
+// // List Accounts
+// // ============================================================================
+
 // export async function listAccounts(
-//   { type, status, search, page, pageSize }: ListAccountsParams = {}
-// ): Promise<Account[] | PaginatedResult<Account>> {
+//   {
+//     type,
+//     status,
+//     search,
+//     page,
+//     pageSize,
+//   }: ListAccountsOptions = {}
+// ): Promise<
+//   Account[] | {
+//     total: number;
+//     page: number;
+//     pageSize: number;
+//     data: Account[];
+//   }
+// > {
 //   const where: Prisma.AccountWhereInput = {
 //     ...(type && { type }),
 //     ...(status && { status }),
 //     ...(search && {
 //       OR: [
-//         { name: { contains: search, mode: 'insensitive' } },
-//         { code: { contains: search, mode: 'insensitive' } }
+//         {
+//           name: {
+//             contains: search,
+//             mode: "insensitive",
+//           },
+//         },
+//         {
+//           code: {
+//             contains: search,
+//           },
+//         },
 //       ],
 //     }),
 //   };
 
-//   // Plain (non-paginated) call — used by the Chart of Accounts tree view.
 //   if (!page && !pageSize) {
 //     return prisma.account.findMany({
 //       where,
-//       orderBy: { code: "asc" },
+//       orderBy: {
+//         code: "asc",
+//       },
 //     });
 //   }
 
@@ -339,7 +366,9 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //     prisma.account.count({ where }),
 //     prisma.account.findMany({
 //       where,
-//       orderBy: { code: "asc" },
+//       orderBy: {
+//         code: "asc",
+//       },
 //       skip,
 //       take,
 //     }),
@@ -353,75 +382,107 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //   };
 // }
 
-// /**
-//  * Returns the Chart of Accounts as a parent -> children tree.
-//  */
-// export async function getAccountTree(): Promise<AccountWithChildren[]> {
+// // ============================================================================
+// // Account Tree
+// // ============================================================================
+
+// export async function getAccountTree(): Promise<any[]> {
 //   const all = await prisma.account.findMany({
-//     orderBy: { code: "asc" },
+//     orderBy: {
+//       code: "asc",
+//     },
 //   });
 
-//   const byId = new Map<string, AccountWithChildren>(
-//     all.map((a) => [a.id, { ...a, children: [] }])
+//   const byId = new Map<string, any>(
+//     all.map((account) => [
+//       account.id,
+//       {
+//         ...account,
+//         children: [],
+//       },
+//     ])
 //   );
-//   const roots: AccountWithChildren[] = [];
 
-//   for (const acc of byId.values()) {
-//     if (acc.parentAccountId && byId.has(acc.parentAccountId)) {
-//       const parent = byId.get(acc.parentAccountId);
-//       if (parent) {
-//         parent.children.push(acc);
-//       }
+//   const roots: any[] = [];
+
+//   for (const account of byId.values()) {
+//     if (
+//       account.parentAccountId &&
+//       byId.has(account.parentAccountId)
+//     ) {
+//       byId.get(account.parentAccountId).children.push(account);
 //     } else {
-//       roots.push(acc);
+//       roots.push(account);
 //     }
 //   }
 
 //   return roots;
 // }
 
-// export async function getAccountById(id: string): Promise<Account> {
+// // ============================================================================
+// // Get Account By ID
+// // ============================================================================
+
+// export async function getAccountById(
+//   id: string
+// ): Promise<Account> {
 //   const account = await prisma.account.findUnique({
 //     where: { id },
 //   });
+
 //   if (!account) {
 //     throw new AccountServiceError("Account not found", 404);
 //   }
+
 //   return account;
 // }
 
+// // ============================================================================
+// // Get System Account
+// // ============================================================================
+
 // export async function getBySystemKey(
 //   systemKey: string,
-//   tx: Prisma.TransactionClient = prisma
+//   tx: Prisma.TransactionClient | PrismaClient = prisma
 // ): Promise<Account> {
 //   const account = await tx.account.findUnique({
-//     where: { systemKey },
+//     where: {
+//       systemKey,
+//     },
 //   });
+
 //   if (!account) {
 //     throw new AccountServiceError(
-//       `Required system account "${systemKey}" is not configured. Run the seed script or create it in the Chart of Accounts first.`,
+//       `Required system account "${systemKey}" is not configured. Run the seed script or create it first.`,
 //       500
 //     );
 //   }
+
 //   return account;
 // }
+
+// // ============================================================================
+// // Create Account
+// // ============================================================================
 
 // export async function createAccount(
 //   data: CreateAccountInput
 // ): Promise<Account> {
 //   if (!data.name || !data.type) {
-//     throw new AccountServiceError("Account name and type are required.");
+//     throw new AccountServiceError(
+//       "Account Code and Name should be unique."
+//     );
 //   }
 
-//   const code = data.code?.trim()
-//     ? data.code.trim()
-//     : await generateNextCode(data.type);
+//   const code =
+//     data.code?.trim() ||
+//     (await generateNextCode(data.type));
 
 //   try {
 //     return await prisma.account.create({
 //       data: {
 //         code,
-//         name: data.name.trim(),
+//         name: data.name,
 //         type: data.type,
 //         systemKey: data.systemKey ?? null,
 //         parentAccountId: data.parentAccountId ?? null,
@@ -431,29 +492,34 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //       },
 //     });
 //   } catch (error) {
-//     // Duplicate Code/Name
 //     if (
 //       error instanceof Prisma.PrismaClientKnownRequestError &&
 //       error.code === "P2002"
 //     ) {
-//       const target = error.meta?.target as string[] | undefined;
+//       const target = error.meta?.target;
 
-//       if (target?.includes("accounts_code_key")) {
+//       if (
+//         Array.isArray(target) &&
+//         target.includes("code")
+//       ) {
 //         throw new AccountServiceError(
-//           "Account code already exists. Please choose a different code.",
+//           "Account code already exists.",
 //           409
 //         );
 //       }
 
-//       if (target?.includes("accounts_name_key")) {
+//       if (
+//         Array.isArray(target) &&
+//         target.includes("name")
+//       ) {
 //         throw new AccountServiceError(
-//           "Account name already exists. Please choose a different name.",
+//           "Account name already exists.",
 //           409
 //         );
 //       }
 
 //       throw new AccountServiceError(
-//         "A record with the same information already exists.",
+//         "Duplicate record found.",
 //         409
 //       );
 //     }
@@ -462,37 +528,41 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //   }
 // }
 
+// // ============================================================================
+// // Update Account
+// // ============================================================================
+
 // export async function updateAccount(
 //   id: string,
 //   data: UpdateAccountInput
 // ): Promise<Account> {
 //   await getAccountById(id);
 
-//   const updateData: Prisma.AccountUpdateInput = {};
-  
-//   if (data.name !== undefined) {
-//     updateData.name = data.name;
-//   }
-//   if (data.description !== undefined) {
-//     updateData.description = data.description;
-//   }
-//   if (data.status !== undefined) {
-//     updateData.status = data.status;
-//   }
-//   if (data.parentAccountId !== undefined) {
-//     updateData.parentAccountId = data.parentAccountId;
-//   }
-
 //   return prisma.account.update({
-//     where: { id },
-//     data: updateData,
+//     where: {
+//       id,
+//     },
+//     data: {
+//       ...(data.name !== undefined && {
+//         name: data.name,
+//       }),
+//       ...(data.description !== undefined && {
+//         description: data.description,
+//       }),
+//       ...(data.status !== undefined && {
+//         status: data.status,
+//       }),
+//       ...(data.parentAccountId !== undefined && {
+//         parentAccountId: data.parentAccountId,
+//       }),
+//     },
 //   });
 // }
 
-// /**
-//  * Applies a debit/credit movement to an account's running balance. Must
-//  * be called inside the same transaction as the journal line insert.
-//  */
+// // ============================================================================
+// // Apply Journal Movement
+// // ============================================================================
+
 // export async function applyMovement(
 //   tx: Prisma.TransactionClient,
 //   accountId: string,
@@ -500,10 +570,16 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //   credit: number
 // ): Promise<Account> {
 //   const account = await tx.account.findUnique({
-//     where: { id: accountId },
+//     where: {
+//       id: accountId,
+//     },
 //   });
+
 //   if (!account) {
-//     throw new AccountServiceError(`Account ${accountId} not found`, 404);
+//     throw new AccountServiceError(
+//       `Account ${accountId} not found`,
+//       404
+//     );
 //   }
 
 //   const signedDelta = isDebitNormal(account.type)
@@ -511,7 +587,9 @@ export async function applyMovement(tx, accountId, debit, credit) {
 //     : credit - debit;
 
 //   return tx.account.update({
-//     where: { id: accountId },
+//     where: {
+//       id: accountId,
+//     },
 //     data: {
 //       currentBalance: {
 //         increment: signedDelta,

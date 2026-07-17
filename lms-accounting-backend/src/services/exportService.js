@@ -88,14 +88,14 @@ export function toPdfBuffer(title, columns, rows, { subtitle } = {}) {
 // // Type Definitions
 // // ============================================================================
 
-// export interface ReportColumn {
-//   header: string;
+// export interface ExportColumn {
 //   key: string;
+//   header: string;
 //   width?: number;
 //   numeric?: boolean;
 // }
 
-// export interface ReportRow {
+// export interface ExportRow {
 //   [key: string]: any;
 // }
 
@@ -103,8 +103,13 @@ export function toPdfBuffer(title, columns, rows, { subtitle } = {}) {
 //   subtitle?: string;
 // }
 
+// export interface ExportData {
+//   columns: ExportColumn[];
+//   rows: ExportRow[];
+// }
+
 // // ============================================================================
-// // Excel Export
+// // Service Functions
 // // ============================================================================
 
 // /**
@@ -112,46 +117,34 @@ export function toPdfBuffer(title, columns, rows, { subtitle } = {}) {
 //  */
 // export async function toXlsxBuffer(
 //   title: string,
-//   columns: ReportColumn[],
-//   rows: ReportRow[]
+//   columns: ExportColumn[],
+//   rows: ExportRow[]
 // ): Promise<Buffer> {
 //   const workbook = new ExcelJS.Workbook();
 //   workbook.creator = 'AZZUNIQUE LMS — Accounting Engine';
 //   workbook.created = new Date();
 
-//   // Excel sheet-name length limit is 31 characters
-//   const sheet = workbook.addWorksheet(title.slice(0, 31));
+//   const sheet = workbook.addWorksheet(title.slice(0, 31)); // Excel sheet-name length limit
 
-//   // Set up columns with proper widths
 //   sheet.columns = columns.map((c) => ({
 //     header: c.header,
 //     key: c.key,
 //     width: c.width ?? 20,
 //   }));
-
-//   // Make header row bold
-//   const headerRow = sheet.getRow(1);
-//   headerRow.font = { bold: true };
-
-//   // Add data rows
+  
+//   sheet.getRow(1).font = { bold: true };
+  
 //   rows.forEach((row) => sheet.addRow(row));
 
-//   // Apply number formatting for numeric columns
-//   columns.forEach((c, index) => {
+//   // Light formatting so it reads like a ledger, not a raw data dump.
+//   columns.forEach((c, i) => {
 //     if (c.numeric) {
-//       const columnIndex = index + 1;
-//       sheet.getColumn(columnIndex).numFmt = '#,##0.00';
+//       sheet.getColumn(i + 1).numFmt = '#,##0.00';
 //     }
 //   });
 
-//   // Return the buffer
-//   const buffer = await workbook.xlsx.writeBuffer();
-//   return buffer as Buffer;
+//   return workbook.xlsx.writeBuffer() as Promise<Buffer>;
 // }
-
-// // ============================================================================
-// // PDF Export
-// // ============================================================================
 
 // /**
 //  * Turns the same { columns, rows } shape into a simple tabular PDF buffer.
@@ -160,64 +153,51 @@ export function toPdfBuffer(title, columns, rows, { subtitle } = {}) {
 //  */
 // export function toPdfBuffer(
 //   title: string,
-//   columns: ReportColumn[],
-//   rows: ReportRow[],
-//   { subtitle }: PdfOptions = {}
+//   columns: ExportColumn[],
+//   rows: ExportRow[],
+//   options: PdfOptions = {}
 // ): Promise<Buffer> {
+//   const { subtitle } = options;
+  
 //   return new Promise((resolve, reject) => {
-//     // Determine layout based on column count
-//     const layout = columns.length > 5 ? 'landscape' : 'portrait';
-    
 //     const doc = new PDFDocument({
 //       margin: 40,
 //       size: 'A4',
-//       layout: layout as 'portrait' | 'landscape',
+//       layout: columns.length > 5 ? 'landscape' : 'portrait',
 //     });
-
-//     const chunks: Buffer[] = [];
     
+//     const chunks: Buffer[] = [];
 //     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
 //     doc.on('end', () => resolve(Buffer.concat(chunks)));
 //     doc.on('error', reject);
 
 //     // Title
-//     doc.font('Helvetica-Bold')
-//        .fontSize(16)
-//        .text(title);
-
-//     // Subtitle (optional)
+//     doc.font('Helvetica-Bold').fontSize(16).text(title);
+    
+//     // Subtitle
 //     if (subtitle) {
-//       doc.font('Helvetica')
-//          .fontSize(9)
-//          .fillColor('#555')
-//          .text(subtitle);
+//       doc.font('Helvetica').fontSize(9).fillColor('#555').text(subtitle);
 //     }
     
 //     doc.moveDown(0.8);
 
-//     // Calculate column widths
 //     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 //     const colWidth = pageWidth / columns.length;
 //     const startX = doc.page.margins.left;
-//     let y = doc.page.margins.top + doc.y;
+//     let y = doc.y;
 
-//     // Helper function to draw a row
-//     const drawRow = (values: any[], { bold = false } = {}) => {
-//       doc.font(bold ? 'Helvetica-Bold' : 'Helvetica')
-//          .fontSize(9)
-//          .fillColor('#000');
-
-//       values.forEach((val, index) => {
-//         const align = columns[index]?.numeric ? 'right' : 'left';
-//         doc.text(String(val ?? ''), startX + index * colWidth, y, {
+//     const drawRow = (values: any[], { bold = false } = {}): void => {
+//       doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor('#000');
+      
+//       values.forEach((val, i) => {
+//         doc.text(String(val ?? ''), startX + i * colWidth, y, {
 //           width: colWidth - 6,
-//           align: align as 'left' | 'right' | 'center' | 'justify',
+//           align: columns[i].numeric ? 'right' : 'left',
 //         });
 //       });
-
+      
 //       y += 16;
-
-//       // Check if we need a new page
+      
 //       if (y > doc.page.height - doc.page.margins.bottom - 20) {
 //         doc.addPage();
 //         y = doc.page.margins.top;
@@ -229,98 +209,200 @@ export function toPdfBuffer(title, columns, rows, { subtitle } = {}) {
 //       columns.map((c) => c.header),
 //       { bold: true }
 //     );
-
+    
 //     // Draw separator line
-//     doc.moveTo(startX, y - 4)
-//        .lineTo(startX + pageWidth, y - 4)
-//        .strokeColor('#999')
-//        .stroke();
+//     doc
+//       .moveTo(startX, y - 4)
+//       .lineTo(startX + pageWidth, y - 4)
+//       .strokeColor('#999')
+//       .stroke();
 
 //     // Draw data rows
-//     rows.forEach((row) => {
-//       const rowValues = columns.map((c) => row[c.key]);
-//       drawRow(rowValues);
-//     });
+//     rows.forEach((row) => drawRow(columns.map((c) => row[c.key])));
 
 //     doc.end();
 //   });
 // }
 
 // // ============================================================================
-// // Optional: Export a service interface
-// // ============================================================================
-
-// export interface ReportExportService {
-//   toXlsxBuffer: (title: string, columns: ReportColumn[], rows: ReportRow[]) => Promise<Buffer>;
-//   toPdfBuffer: (title: string, columns: ReportColumn[], rows: ReportRow[], options?: PdfOptions) => Promise<Buffer>;
-// }
-
-// // ============================================================================
-// // Additional Utility Types
+// // Additional Utility Functions
 // // ============================================================================
 
 // /**
-//  * Helper type for creating typed report rows
+//  * Formats a date for export
 //  */
-// export type CreateReportRow<T extends Record<string, any>> = {
-//   [K in keyof T]: T[K];
-// } & ReportRow;
-
-// /**
-//  * Helper function to create typed report rows
-//  */
-// export function createReportRow<T extends Record<string, any>>(
-//   row: T
-// ): CreateReportRow<T> {
-//   return row;
+// export function formatDateForExport(date: Date | string): string {
+//   const d = typeof date === 'string' ? new Date(date) : date;
+//   return d.toLocaleDateString('en-IN', {
+//     day: '2-digit',
+//     month: '2-digit',
+//     year: 'numeric',
+//   });
 // }
 
 // /**
-//  * Helper function to create typed report columns
+//  * Formats a number for export with proper decimal places
 //  */
-// export function createReportColumns<T extends string>(
-//   columns: Array<{
-//     header: string;
-//     key: T;
-//     width?: number;
-//     numeric?: boolean;
-//   }>
-// ): ReportColumn[] {
-//   return columns;
+// export function formatNumberForExport(value: number, decimals: number = 2): string {
+//   return value.toFixed(decimals);
+// }
+
+// /**
+//  * Generates a filename with timestamp
+//  */
+// export function generateExportFilename(baseName: string, extension: 'xlsx' | 'pdf'): string {
+//   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+//   return `${baseName}-${timestamp}.${extension}`;
+// }
+
+// /**
+//  * Sets export headers for HTTP response
+//  */
+// export function setExportHeaders(
+//   res: any,
+//   filename: string,
+//   format: 'xlsx' | 'pdf'
+// ): void {
+//   const contentType = format === 'xlsx'
+//     ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+//     : 'application/pdf';
+  
+//   res.setHeader('Content-Type', contentType);
+//   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 // }
 
 // // ============================================================================
-// // Example Usage (commented out)
+// // Validation Functions
 // // ============================================================================
 
-// /*
-// // Example usage with type safety
-// interface LoanReportRow {
-//   loanId: string;
-//   customerName: string;
-//   amount: number;
-//   status: string;
-//   date: Date;
+// export function validateExportData(data: ExportData): void {
+//   if (!data.columns || data.columns.length === 0) {
+//     throw new Error('Export columns are required');
+//   }
+  
+//   if (!data.rows) {
+//     throw new Error('Export rows are required');
+//   }
 // }
 
-// const columns = createReportColumns<keyof LoanReportRow>([
-//   { header: 'Loan ID', key: 'loanId', width: 15 },
-//   { header: 'Customer', key: 'customerName', width: 25 },
-//   { header: 'Amount', key: 'amount', width: 15, numeric: true },
-//   { header: 'Status', key: 'status', width: 15 },
-//   { header: 'Date', key: 'date', width: 15 },
-// ]);
+// export function validateExportColumns(columns: ExportColumn[]): void {
+//   columns.forEach((col) => {
+//     if (!col.key) {
+//       throw new Error('Each column must have a key');
+//     }
+//     if (!col.header) {
+//       throw new Error('Each column must have a header');
+//     }
+//   });
+// }
 
-// const rows: LoanReportRow[] = [
-//   { loanId: 'L001', customerName: 'John Doe', amount: 10000, status: 'Active', date: new Date() },
-//   // ...
-// ];
+// // ============================================================================
+// // PDF Styling Options
+// // ============================================================================
 
-// // Export to Excel
-// const excelBuffer = await toXlsxBuffer('Loan Report', columns, rows);
+// export interface PdfStyleOptions {
+//   fontSize?: number;
+//   fontColor?: string;
+//   bold?: boolean;
+//   align?: 'left' | 'center' | 'right';
+//   backgroundColor?: string;
+// }
 
-// // Export to PDF
-// const pdfBuffer = await toPdfBuffer('Loan Report', columns, rows, {
-//   subtitle: 'Generated on ' + new Date().toLocaleDateString()
-// });
-// */
+// export interface PdfDocumentOptions {
+//   margins?: number | { top: number; bottom: number; left: number; right: number };
+//   pageSize?: 'A4' | 'A3' | 'Legal' | 'Letter';
+//   layout?: 'portrait' | 'landscape';
+// }
+
+// /**
+//  * Creates a styled PDF with custom options
+//  */
+// export function toStyledPdfBuffer(
+//   title: string,
+//   columns: ExportColumn[],
+//   rows: ExportRow[],
+//   options: PdfOptions & PdfDocumentOptions = {}
+// ): Promise<Buffer> {
+//   const { subtitle, margins = 40, pageSize = 'A4', layout = 'portrait' } = options;
+  
+//   return new Promise((resolve, reject) => {
+//     const doc = new PDFDocument({
+//       margin: margins,
+//       size: pageSize,
+//       layout: columns.length > 5 ? 'landscape' : layout,
+//     });
+    
+//     const chunks: Buffer[] = [];
+//     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+//     doc.on('end', () => resolve(Buffer.concat(chunks)));
+//     doc.on('error', reject);
+
+//     // Title with styling
+//     doc.font('Helvetica-Bold').fontSize(16).text(title);
+    
+//     // Subtitle
+//     if (subtitle) {
+//       doc.font('Helvetica').fontSize(9).fillColor('#555').text(subtitle);
+//     }
+    
+//     doc.moveDown(0.8);
+
+//     // Table rendering
+//     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+//     const colWidth = pageWidth / columns.length;
+//     const startX = doc.page.margins.left;
+//     let y = doc.y;
+
+//     // Draw header with background
+//     const headerHeight = 20;
+//     doc.rect(startX, y - 2, pageWidth, headerHeight)
+//        .fillColor('#e0e0e0')
+//        .fill();
+    
+//     doc.fillColor('#000');
+//     doc.font('Helvetica-Bold').fontSize(10);
+    
+//     columns.forEach((col, i) => {
+//       doc.text(col.header, startX + i * colWidth + 4, y + 2, {
+//         width: colWidth - 8,
+//         align: col.numeric ? 'right' : 'left',
+//       });
+//     });
+    
+//     y += headerHeight + 4;
+
+//     // Draw rows
+//     rows.forEach((row, rowIndex) => {
+//       // Alternate row colors for readability
+//       if (rowIndex % 2 === 0) {
+//         doc.rect(startX, y - 2, pageWidth, 18)
+//            .fillColor('#f8f8f8')
+//            .fill();
+//       }
+      
+//       doc.fillColor('#000');
+//       doc.font('Helvetica').fontSize(9);
+      
+//       columns.forEach((col, i) => {
+//         const value = row[col.key];
+//         const formattedValue = col.numeric && typeof value === 'number'
+//           ? formatNumberForExport(value)
+//           : String(value ?? '');
+        
+//         doc.text(formattedValue, startX + i * colWidth + 4, y + 2, {
+//           width: colWidth - 8,
+//           align: col.numeric ? 'right' : 'left',
+//         });
+//       });
+      
+//       y += 18;
+      
+//       if (y > doc.page.height - doc.page.margins.bottom - 20) {
+//         doc.addPage();
+//         y = doc.page.margins.top;
+//       }
+//     });
+
+//     doc.end();
+//   });
+// }

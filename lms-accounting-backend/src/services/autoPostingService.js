@@ -406,48 +406,43 @@ export async function postRecoveryPayment({
 
 // typescript code  👇👇
 
-
-
-// import { Prisma } from "@prisma/client";
 // import prisma from "../lib/prisma.js";
-// import { createJournal } from "./journalService.js";
+// import { createJournal, JournalLineInput, JournalCreateInput } from "./journalService.js";
 // import { getBySystemKey } from "./accountService.js";
 // import KEYS from "../utils/systemAccounts.js";
+// import { Prisma } from "@prisma/client";
 
 // // ============================================================================
 // // Type Definitions
 // // ============================================================================
 
-// export type DisbursementMode = "BANK_TRANSFER" | "CASH" | "CHEQUE" | "UPI";
-// export type PaymentMode = "UPI" | "CASH" | "BANK_TRANSFER" | "CHEQUE" | "CARD";
-
 // export interface LoanDisbursementInput {
 //   loanDisbursementId?: string;
 //   loanApplicationId: string;
 //   amount: number;
-//   disbursementDate?: Date;
+//   disbursementDate?: Date | string;
 //   narration?: string;
 //   branchId?: string;
-//   disbursementMode?: DisbursementMode;
+//   disbursementMode?: "BANK_TRANSFER" | "CASH" | "CHEQUE";
 // }
 
 // export interface EmiCollectionInput {
 //   emiPaymentId?: string;
 //   emiScheduleId?: string;
-//   loanApplicationId: string;
+//   loanApplicationId?: string;
 //   principalAmount?: number;
 //   interestAmount?: number;
 //   penaltyAmount?: number;
 //   bounceAmount?: number;
-//   paymentDate?: Date;
+//   paymentDate?: Date | string;
 //   narration?: string;
-//   paymentMode?: PaymentMode;
+//   paymentMode?: "UPI" | "CASH" | "BANK_TRANSFER" | "CHEQUE";
 // }
 
 // export interface PenaltyCollectionInput {
 //   referenceId: string;
 //   amount: number;
-//   collectionDate?: Date;
+//   collectionDate?: Date | string;
 //   narration?: string;
 // }
 
@@ -455,14 +450,14 @@ export async function postRecoveryPayment({
 //   loanApplicationId: string;
 //   amount: number;
 //   collectedImmediately?: boolean;
-//   feeDate?: Date;
+//   feeDate?: Date | string;
 //   narration?: string;
 // }
 
 // export interface RefundInput {
 //   referenceId: string;
 //   amount: number;
-//   refundDate?: Date;
+//   refundDate?: Date | string;
 //   reason?: string;
 //   narration?: string;
 // }
@@ -470,7 +465,7 @@ export async function postRecoveryPayment({
 // export interface WriteOffInput {
 //   loanApplicationId: string;
 //   amount: number;
-//   writeOffDate?: Date;
+//   writeOffDate?: Date | string;
 //   narration?: string;
 // }
 
@@ -480,34 +475,40 @@ export async function postRecoveryPayment({
 //   loanApplicationId?: string;
 //   customerId?: string;
 //   amount: number;
-//   paymentDate?: Date;
+//   paymentDate?: Date | string;
 //   narration?: string;
-//   paymentMode?: PaymentMode;
+//   paymentMode?: "CASH" | "UPI" | "BANK_TRANSFER" | "CHEQUE";
 // }
 
-// export interface JournalEntry {
+// export interface JournalEntryResponse {
 //   id: string;
 //   // Add other fields as needed
 // }
 
 // // ============================================================================
-// // 1. Loan Disbursement
+// // Error Classes
 // // ============================================================================
 
-// /**
-//  * Implements the "Auto Posting Rules" table from the accounting spec:
-//  *   LMS Event                -> Accounting Entry
-//  *   Loan Disbursement        -> Dr Loan Receivable / Cr Bank
-//  *   EMI Collection           -> Dr Bank / Cr Loan Receivable, Interest Income, Penalty Income, Bounce Income
-//  *   Penalty Collection       -> Dr Bank / Cr Penalty Income
-//  *   Processing Fee           -> Dr Customer Receivable (or Bank) / Cr Processing Fee Income
-//  *   Refund                   -> reverse of the original receipt
-//  *   Write-Off                -> Dr Bad Debt Expense / Cr Loan Receivable
-//  *
-//  * Every function here is idempotent-safe to call once per business event;
-//  * wire these calls into your existing loan-application/EMI/recovery
-//  * controllers right after the underlying record is created.
-//  */
+// export class AutoPostingError extends Error {
+//   public readonly status: number;
+  
+//   constructor(message: string, status: number = 400) {
+//     super(message);
+//     this.name = "AutoPostingError";
+//     this.status = status;
+//   }
+// }
+
+// // ============================================================================
+// // Helper Types
+// // ============================================================================
+
+// type DisbursementMode = "BANK_TRANSFER" | "CASH" | "CHEQUE";
+// type PaymentMode = "UPI" | "CASH" | "BANK_TRANSFER" | "CHEQUE";
+
+// // ============================================================================
+// // 1. Loan Disbursement
+// // ============================================================================
 
 // export async function postLoanDisbursement({
 //   loanDisbursementId,
@@ -517,7 +518,7 @@ export async function postRecoveryPayment({
 //   narration,
 //   branchId,
 //   disbursementMode = "BANK_TRANSFER",
-// }: LoanDisbursementInput): Promise<JournalEntry> {
+// }: LoanDisbursementInput): Promise<JournalEntryResponse> {
 //   const [loanReceivable, bank] = await Promise.all([
 //     getBySystemKey(KEYS.LOAN_RECEIVABLE),
 //     getBySystemKey(KEYS.BANK_ACCOUNT),
@@ -532,14 +533,14 @@ export async function postRecoveryPayment({
 //       where: { id: loanApplicationId },
 //     });
 //     if (!loanApp) {
-//       throw new Error(`LoanApplication ${loanApplicationId} not found`);
+//       throw new AutoPostingError(`LoanApplication ${loanApplicationId} not found`, 404);
 //     }
 //     const disbursement = await prisma.loanDisbursement.create({
 //       data: {
 //         loanApplicationId,
 //         amount,
 //         principalAmount: amount,
-//         disbursementMode,
+//         disbursementMode: disbursementMode as any,
 //         transactionReference: `DISB-${Date.now()}`,
 //         branchId: branchId ?? loanApp.branchId,
 //       },
@@ -548,20 +549,21 @@ export async function postRecoveryPayment({
 //   }
 
 //   const entry = await createJournal({
-//     narration:
-//       narration ?? `Loan disbursement for application ${loanApplicationId}`,
+//     narration: narration ?? `Loan disbursement for application ${loanApplicationId}`,
 //     referenceType: "LOAN_DISBURSEMENT",
 //     referenceId: loanApplicationId,
-//     transactionDate: disbursementDate ?? new Date(),
+//     transactionDate: disbursementDate ? new Date(disbursementDate) : new Date(),
 //     loanDisbursementId: resolvedDisbursementId,
 //     lines: [
 //       {
 //         accountId: loanReceivable.id,
 //         debit: amount,
+//         credit: 0,
 //         description: "Loan principal receivable",
 //       },
 //       {
 //         accountId: bank.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Funds disbursed from bank",
 //       },
@@ -591,16 +593,16 @@ export async function postRecoveryPayment({
 //   paymentDate,
 //   narration,
 //   paymentMode = "UPI",
-// }: EmiCollectionInput): Promise<JournalEntry> {
+// }: EmiCollectionInput): Promise<JournalEntryResponse> {
 //   const total = principalAmount + interestAmount + penaltyAmount + bounceAmount;
 //   if (total <= 0) {
-//     throw new Error("EMI collection amount must be greater than zero");
+//     throw new AutoPostingError("EMI collection amount must be greater than zero");
 //   }
 
 //   let resolvedEmiPaymentId = emiPaymentId;
 //   if (!resolvedEmiPaymentId) {
 //     if (!emiScheduleId) {
-//       throw new Error("Provide either emiPaymentId or emiScheduleId");
+//       throw new AutoPostingError("Provide either emiPaymentId or emiScheduleId");
 //     }
 //     const payment = await prisma.emiPayment.create({
 //       data: {
@@ -610,8 +612,8 @@ export async function postRecoveryPayment({
 //         interestPaid: interestAmount,
 //         penaltyPaid: penaltyAmount,
 //         bouncePaid: bounceAmount,
-//         paymentDate: paymentDate ?? new Date(),
-//         paymentMode,
+//         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+//         paymentMode: paymentMode as any,
 //       },
 //     });
 //     resolvedEmiPaymentId = payment.id;
@@ -621,47 +623,53 @@ export async function postRecoveryPayment({
 //     KEYS.BANK_ACCOUNT,
 //     KEYS.LOAN_RECEIVABLE,
 //     KEYS.INTEREST_INCOME,
-//   ] as const;
+//   ];
 //   if (penaltyAmount > 0) needed.push(KEYS.PENALTY_INCOME);
 //   if (bounceAmount > 0) needed.push(KEYS.BOUNCE_CHARGE_INCOME);
 
-//   const accounts = await Promise.all(
-//     needed.map(async (key) => [key, await getBySystemKey(key)] as const)
+//   const accounts = Object.fromEntries(
+//     await Promise.all(
+//       needed.map(async (key) => [key, await getBySystemKey(key)]),
+//     ),
 //   );
-//   const accountsMap = Object.fromEntries(accounts);
 
-//   const lines = [
+//   const lines: JournalLineInput[] = [
 //     {
-//       accountId: accountsMap[KEYS.BANK_ACCOUNT].id,
+//       accountId: accounts[KEYS.BANK_ACCOUNT].id,
 //       debit: total,
+//       credit: 0,
 //       description: "EMI received",
 //     },
 //   ];
-
+  
 //   if (principalAmount > 0) {
 //     lines.push({
-//       accountId: accountsMap[KEYS.LOAN_RECEIVABLE].id,
+//       accountId: accounts[KEYS.LOAN_RECEIVABLE].id,
+//       debit: 0,
 //       credit: principalAmount,
 //       description: "Principal component",
 //     });
 //   }
 //   if (interestAmount > 0) {
 //     lines.push({
-//       accountId: accountsMap[KEYS.INTEREST_INCOME].id,
+//       accountId: accounts[KEYS.INTEREST_INCOME].id,
+//       debit: 0,
 //       credit: interestAmount,
 //       description: "Interest component",
 //     });
 //   }
 //   if (penaltyAmount > 0) {
 //     lines.push({
-//       accountId: accountsMap[KEYS.PENALTY_INCOME].id,
+//       accountId: accounts[KEYS.PENALTY_INCOME].id,
+//       debit: 0,
 //       credit: penaltyAmount,
 //       description: "Late payment penalty",
 //     });
 //   }
 //   if (bounceAmount > 0) {
 //     lines.push({
-//       accountId: accountsMap[KEYS.BOUNCE_CHARGE_INCOME].id,
+//       accountId: accounts[KEYS.BOUNCE_CHARGE_INCOME].id,
+//       debit: 0,
 //       credit: bounceAmount,
 //       description: "Bounce charges",
 //     });
@@ -671,7 +679,7 @@ export async function postRecoveryPayment({
 //     narration: narration ?? `EMI collection for loan ${loanApplicationId}`,
 //     referenceType: "EMI_PAYMENT",
 //     referenceId: resolvedEmiPaymentId,
-//     transactionDate: paymentDate ?? new Date(),
+//     transactionDate: paymentDate ? new Date(paymentDate) : new Date(),
 //     lines,
 //   });
 
@@ -684,7 +692,7 @@ export async function postRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 3. Standalone Penalty Collection (penalty collected outside an EMI, e.g. a delinquency fee)
+// // 3. Standalone Penalty Collection
 // // ============================================================================
 
 // export async function postPenaltyCollection({
@@ -692,7 +700,7 @@ export async function postRecoveryPayment({
 //   amount,
 //   collectionDate,
 //   narration,
-// }: PenaltyCollectionInput): Promise<JournalEntry> {
+// }: PenaltyCollectionInput): Promise<JournalEntryResponse> {
 //   const [bank, penaltyIncome] = await Promise.all([
 //     getBySystemKey(KEYS.BANK_ACCOUNT),
 //     getBySystemKey(KEYS.PENALTY_INCOME),
@@ -702,15 +710,17 @@ export async function postRecoveryPayment({
 //     narration: narration ?? `Penalty collected for ${referenceId}`,
 //     referenceType: "PENALTY",
 //     referenceId,
-//     transactionDate: collectionDate ?? new Date(),
+//     transactionDate: collectionDate ? new Date(collectionDate) : new Date(),
 //     lines: [
 //       {
 //         accountId: bank.id,
 //         debit: amount,
+//         credit: 0,
 //         description: "Penalty received",
 //       },
 //       {
 //         accountId: penaltyIncome.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Penalty income",
 //       },
@@ -719,7 +729,7 @@ export async function postRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 4. Processing Fee (charged at login/disbursement)
+// // 4. Processing Fee
 // // ============================================================================
 
 // export async function postProcessingFee({
@@ -728,10 +738,10 @@ export async function postRecoveryPayment({
 //   collectedImmediately = true,
 //   feeDate,
 //   narration,
-// }: ProcessingFeeInput): Promise<JournalEntry> {
+// }: ProcessingFeeInput): Promise<JournalEntryResponse> {
 //   const [debitAccount, feeIncome] = await Promise.all([
 //     getBySystemKey(
-//       collectedImmediately ? KEYS.BANK_ACCOUNT : KEYS.CUSTOMER_RECEIVABLE
+//       collectedImmediately ? KEYS.BANK_ACCOUNT : KEYS.CUSTOMER_RECEIVABLE,
 //     ),
 //     getBySystemKey(KEYS.PROCESSING_FEE_INCOME),
 //   ]);
@@ -740,17 +750,19 @@ export async function postRecoveryPayment({
 //     narration: narration ?? `Processing fee for loan ${loanApplicationId}`,
 //     referenceType: "PROCESSING_FEE",
 //     referenceId: loanApplicationId,
-//     transactionDate: feeDate ?? new Date(),
+//     transactionDate: feeDate ? new Date(feeDate) : new Date(),
 //     lines: [
 //       {
 //         accountId: debitAccount.id,
 //         debit: amount,
+//         credit: 0,
 //         description: collectedImmediately
 //           ? "Processing fee collected"
 //           : "Processing fee receivable",
 //       },
 //       {
 //         accountId: feeIncome.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Processing fee income",
 //       },
@@ -759,7 +771,7 @@ export async function postRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 5. Refund (reverses a prior receipt, e.g. excess EMI payment or fee refund)
+// // 5. Refund
 // // ============================================================================
 
 // export async function postRefund({
@@ -768,7 +780,7 @@ export async function postRecoveryPayment({
 //   refundDate,
 //   reason,
 //   narration,
-// }: RefundInput): Promise<JournalEntry> {
+// }: RefundInput): Promise<JournalEntryResponse> {
 //   const [bank, feeIncome] = await Promise.all([
 //     getBySystemKey(KEYS.BANK_ACCOUNT),
 //     getBySystemKey(KEYS.PROCESSING_FEE_INCOME),
@@ -778,15 +790,17 @@ export async function postRecoveryPayment({
 //     narration: narration ?? `Refund: ${reason ?? referenceId}`,
 //     referenceType: "REFUND",
 //     referenceId,
-//     transactionDate: refundDate ?? new Date(),
+//     transactionDate: refundDate ? new Date(refundDate) : new Date(),
 //     lines: [
 //       {
 //         accountId: feeIncome.id,
 //         debit: amount,
+//         credit: 0,
 //         description: "Reversal of income",
 //       },
 //       {
 //         accountId: bank.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Refund paid out",
 //       },
@@ -803,7 +817,7 @@ export async function postRecoveryPayment({
 //   amount,
 //   writeOffDate,
 //   narration,
-// }: WriteOffInput): Promise<JournalEntry> {
+// }: WriteOffInput): Promise<JournalEntryResponse> {
 //   const [badDebt, loanReceivable] = await Promise.all([
 //     getBySystemKey(KEYS.BAD_DEBT_EXPENSE),
 //     getBySystemKey(KEYS.LOAN_RECEIVABLE),
@@ -813,15 +827,17 @@ export async function postRecoveryPayment({
 //     narration: narration ?? `Write-off of loan ${loanApplicationId}`,
 //     referenceType: "WRITE_OFF",
 //     referenceId: loanApplicationId,
-//     transactionDate: writeOffDate ?? new Date(),
+//     transactionDate: writeOffDate ? new Date(writeOffDate) : new Date(),
 //     lines: [
 //       {
 //         accountId: badDebt.id,
 //         debit: amount,
+//         credit: 0,
 //         description: "Bad debt expense",
 //       },
 //       {
 //         accountId: loanReceivable.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Loan receivable written off",
 //       },
@@ -830,7 +846,7 @@ export async function postRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 7. Recovery / Settlement collection (post-default recovery payment)
+// // 7. Recovery / Settlement Collection
 // // ============================================================================
 
 // export async function postRecoveryPayment({
@@ -842,7 +858,7 @@ export async function postRecoveryPayment({
 //   paymentDate,
 //   narration,
 //   paymentMode = "CASH",
-// }: RecoveryPaymentInput): Promise<JournalEntry> {
+// }: RecoveryPaymentInput): Promise<JournalEntryResponse> {
 //   const [bank, loanReceivable] = await Promise.all([
 //     getBySystemKey(KEYS.BANK_ACCOUNT),
 //     getBySystemKey(KEYS.LOAN_RECEIVABLE),
@@ -854,8 +870,9 @@ export async function postRecoveryPayment({
 //   if (!resolvedRecoveryPaymentId) {
 //     if (!resolvedLoanRecoveryId) {
 //       if (!loanApplicationId || !customerId) {
-//         throw new Error(
-//           "Provide recoveryPaymentId, or loanRecoveryId, or (loanApplicationId + customerId) to create one"
+//         throw new AutoPostingError(
+//           "Provide recoveryPaymentId, or loanRecoveryId, or (loanApplicationId + customerId) to create one",
+//           400,
 //         );
 //       }
 //       const recovery = await prisma.loanRecovery.create({
@@ -873,8 +890,8 @@ export async function postRecoveryPayment({
 //       data: {
 //         loanRecoveryId: resolvedLoanRecoveryId,
 //         amount,
-//         paymentDate: paymentDate ?? new Date(),
-//         paymentMode,
+//         paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+//         paymentMode: paymentMode as any,
 //       },
 //     });
 //     resolvedRecoveryPaymentId = payment.id;
@@ -883,16 +900,18 @@ export async function postRecoveryPayment({
 //   const entry = await createJournal({
 //     narration: narration ?? `Recovery payment for loan ${loanApplicationId}`,
 //     referenceType: "RECOVERY",
-//     referenceId: loanApplicationId ?? resolvedLoanRecoveryId,
-//     transactionDate: paymentDate ?? new Date(),
+//     referenceId: loanApplicationId,
+//     transactionDate: paymentDate ? new Date(paymentDate) : new Date(),
 //     lines: [
 //       {
 //         accountId: bank.id,
 //         debit: amount,
+//         credit: 0,
 //         description: "Recovery amount received",
 //       },
 //       {
 //         accountId: loanReceivable.id,
+//         debit: 0,
 //         credit: amount,
 //         description: "Loan receivable recovered",
 //       },
@@ -908,15 +927,73 @@ export async function postRecoveryPayment({
 // }
 
 // // ============================================================================
-// // Optional: Export service interface for type checking
+// // Utility Functions
 // // ============================================================================
 
-// export interface AutoPostingService {
-//   postLoanDisbursement: (input: LoanDisbursementInput) => Promise<JournalEntry>;
-//   postEmiCollection: (input: EmiCollectionInput) => Promise<JournalEntry>;
-//   postPenaltyCollection: (input: PenaltyCollectionInput) => Promise<JournalEntry>;
-//   postProcessingFee: (input: ProcessingFeeInput) => Promise<JournalEntry>;
-//   postRefund: (input: RefundInput) => Promise<JournalEntry>;
-//   postWriteOff: (input: WriteOffInput) => Promise<JournalEntry>;
-//   postRecoveryPayment: (input: RecoveryPaymentInput) => Promise<JournalEntry>;
+// export function validateDisbursementInput(data: LoanDisbursementInput): void {
+//   if (!data.loanApplicationId) {
+//     throw new AutoPostingError("loanApplicationId is required", 400);
+//   }
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validateEmiCollectionInput(data: EmiCollectionInput): void {
+//   const total = (data.principalAmount || 0) + 
+//                 (data.interestAmount || 0) + 
+//                 (data.penaltyAmount || 0) + 
+//                 (data.bounceAmount || 0);
+//   if (total <= 0) {
+//     throw new AutoPostingError("Total collection amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validatePenaltyInput(data: PenaltyCollectionInput): void {
+//   if (!data.referenceId) {
+//     throw new AutoPostingError("referenceId is required", 400);
+//   }
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validateProcessingFeeInput(data: ProcessingFeeInput): void {
+//   if (!data.loanApplicationId) {
+//     throw new AutoPostingError("loanApplicationId is required", 400);
+//   }
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validateRefundInput(data: RefundInput): void {
+//   if (!data.referenceId) {
+//     throw new AutoPostingError("referenceId is required", 400);
+//   }
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validateWriteOffInput(data: WriteOffInput): void {
+//   if (!data.loanApplicationId) {
+//     throw new AutoPostingError("loanApplicationId is required", 400);
+//   }
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+// }
+
+// export function validateRecoveryPaymentInput(data: RecoveryPaymentInput): void {
+//   if (!data.amount || data.amount <= 0) {
+//     throw new AutoPostingError("Amount must be greater than zero", 400);
+//   }
+//   // Either recoveryPaymentId, loanRecoveryId, or (loanApplicationId + customerId) must be provided
+//   if (!data.recoveryPaymentId && !data.loanRecoveryId && !(data.loanApplicationId && data.customerId)) {
+//     throw new AutoPostingError(
+//       "Provide recoveryPaymentId, or loanRecoveryId, or (loanApplicationId + customerId)",
+//       400
+//     );
+//   }
 // }

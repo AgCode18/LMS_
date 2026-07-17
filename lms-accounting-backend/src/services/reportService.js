@@ -376,203 +376,70 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 // typescript code  👇👇
 
 
-// import { Prisma, Account, JournalEntryLine, JournalEntry, Branch } from "@prisma/client";
+
 // import prisma from '../lib/prisma.js';
 // import { isDebitNormal } from './accountService.js';
+// import { Prisma } from '@prisma/client';
 
-// // ============================================================================
-// // Error Class
-// // ============================================================================
+// // ==================== Type Definitions ====================
 
-// export class ReportServiceError extends Error {
-//   public status: number;
+// // Account types
+// type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+
+// // Core interfaces
+// interface JournalEntryLine {
+//   id: string;
+//   accountId: string;
+//   debit: number;
+//   credit: number;
+//   description?: string | null;
+//   isCleared: boolean;
+//   clearedDate: Date | null;
+//   journalEntry: {
+//     id: string;
+//     transactionDate: Date;
+//     voucherNo: string;
+//     narration: string;
+//     referenceType?: string | null;
+//     referenceId?: string | null;
+//     status: string;
+//   };
+//   account?: {
+//     id: string;
+//     code: string;
+//     name: string;
+//     type: AccountType;
+//   };
+// }
+
+// interface Account {
+//   id: string;
+//   code: string;
+//   name: string;
+//   type: AccountType;
+//   openingBalance: number;
+//   branchId?: string | null;
+// }
+
+// interface Branch {
+//   id: string;
+//   code: string;
+//   name: string;
+// }
+
+// // ==================== Error Class ====================
+
+// class ReportServiceError extends Error {
+//   public readonly status: number;
   
 //   constructor(message: string, status: number = 404) {
 //     super(message);
 //     this.name = 'ReportServiceError';
 //     this.status = status;
-//     Object.setPrototypeOf(this, ReportServiceError.prototype);
 //   }
 // }
 
-// // ============================================================================
-// // Type Definitions
-// // ============================================================================
-
-// export interface DateRange {
-//   from?: Date | string;
-//   to?: Date | string;
-// }
-
-// export interface TrialBalanceParams {
-//   asOf?: Date | string;
-// }
-
-// export interface AccountLedgerParams {
-//   from?: Date | string;
-//   to?: Date | string;
-// }
-
-// export interface BankReconciliationParams {
-//   statementDate: Date | string;
-// }
-
-// export interface ClearLineParams {
-//   isCleared: boolean;
-//   clearedDate?: Date | string;
-// }
-
-// export interface ProfitAndLossParams {
-//   from?: Date | string;
-//   to?: Date | string;
-// }
-
-// export interface BalanceSheetParams {
-//   asOf?: Date | string;
-// }
-
-// export interface BranchWiseSummaryParams {
-//   from?: Date | string;
-//   to?: Date | string;
-//   branchId?: string;
-//   branchSearch?: string;
-// }
-
-// // Report Row Types
-// export interface TrialBalanceRow {
-//   accountId: string;
-//   code: string;
-//   name: string;
-//   type: string;
-//   totalDebit: number;
-//   totalCredit: number;
-//   closingBalance: number;
-// }
-
-// export interface TrialBalanceResult {
-//   asOf: string;
-//   rows: TrialBalanceRow[];
-//   totalDebit: number;
-//   totalCredit: number;
-//   balanced: boolean;
-// }
-
-// export interface AccountLedgerRow {
-//   date: Date;
-//   voucherNo: string;
-//   narration: string | null;
-//   referenceType: string | null;
-//   referenceId: string | null;
-//   debit: number;
-//   credit: number;
-//   runningBalance: number;
-// }
-
-// export interface AccountLedgerResult {
-//   account: {
-//     id: string;
-//     code: string;
-//     name: string;
-//     type: string;
-//   };
-//   openingBalance: number;
-//   closingBalance: number;
-//   rows: AccountLedgerRow[];
-// }
-
-// export interface BankReconciliationRow {
-//   id: string;
-//   date: Date;
-//   voucherNo: string;
-//   narration: string | null;
-//   debit: number;
-//   credit: number;
-//   runningBalance: number;
-//   isCleared: boolean;
-//   clearedDate: Date | null;
-//   isDepositInTransit: boolean;
-//   isOutstandingCheck: boolean;
-// }
-
-// export interface BankReconciliationResult {
-//   account: {
-//     id: string;
-//     code: string;
-//     name: string;
-//     type: string;
-//   };
-//   openingBalance: number;
-//   bookBalance: number;
-//   statementDate: Date;
-//   rows: BankReconciliationRow[];
-//   depositsInTransit: number;
-//   outstandingChecks: number;
-//   netAdjustment: number;
-// }
-
-// export interface ProfitAndLossRow {
-//   code: string;
-//   name: string;
-//   type: string;
-//   amount: number;
-// }
-
-// export interface ProfitAndLossResult {
-//   from: Date | string | null;
-//   to: Date | string | null;
-//   income: ProfitAndLossRow[];
-//   expense: ProfitAndLossRow[];
-//   totalIncome: number;
-//   totalExpense: number;
-//   netProfit: number;
-// }
-
-// export interface BalanceSheetRow {
-//   accountId: string;
-//   code: string;
-//   name: string;
-//   type: string;
-//   totalDebit: number;
-//   totalCredit: number;
-//   closingBalance: number;
-// }
-
-// export interface BalanceSheetResult {
-//   asOf: string;
-//   assets: BalanceSheetRow[];
-//   liabilities: BalanceSheetRow[];
-//   equity: BalanceSheetRow[];
-//   retainedEarnings: number;
-//   totalAssets: number;
-//   totalLiabilities: number;
-//   totalEquity: number;
-//   balanced: boolean;
-// }
-
-// export interface CustomerLedgerResult {
-//   customerId: string;
-//   loans: any[];
-//   entries: any[];
-// }
-
-// export interface BranchWiseSummaryRow {
-//   branchId: string;
-//   branchCode: string | null;
-//   branchName: string | null;
-//   _sum?: { amount: number | null };
-//   _count?: { _all: number };
-//   amount?: number;
-//   count?: number;
-// }
-
-// export interface BranchWiseSummaryResult {
-//   disbursementsByBranch: BranchWiseSummaryRow[];
-//   applicationsByBranch: BranchWiseSummaryRow[];
-// }
-
-// // ============================================================================
-// // Helper Functions
-// // ============================================================================
+// // ==================== Utility Functions ====================
 
 // const startOfDay = (date: Date | string): Date => {
 //   const d = new Date(date);
@@ -586,30 +453,56 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   return d;
 // };
 
-// const dateRangeWhere = (from?: Date | string, to?: Date | string): any => {
+// interface DateRangeWhereOptions {
+//   from?: string | Date;
+//   to?: string | Date;
+// }
+
+// const dateRangeWhere = (from?: string | Date, to?: string | Date): Prisma.JournalEntryWhereInput => {
 //   if (!from && !to) return {};
-//   return {
-//     transactionDate: {
-//       ...(from && { gte: startOfDay(from) }),
-//       ...(to && { lte: endOfDay(to) }),
-//     },
-//   };
+  
+//   const where: Prisma.JournalEntryWhereInput = {};
+  
+//   if (from || to) {
+//     where.transactionDate = {};
+    
+//     if (from) {
+//       where.transactionDate.gte = startOfDay(from);
+//     }
+    
+//     if (to) {
+//       where.transactionDate.lte = endOfDay(to);
+//     }
+//   }
+  
+//   return where;
 // };
 
-// // ============================================================================
-// // 1. Trial Balance
-// // ============================================================================
+// // ==================== Report Functions ====================
 
-// /**
-//  * Trial Balance: every account with its total debits/credits posted up to
-//  * `asOf`, and the resulting closing balance. Total Debit must equal Total
-//  * Credit across the whole book — that equality IS the trial balance check.
-//  */
-// export async function trialBalance(
-//   { asOf }: TrialBalanceParams = {}
-// ): Promise<TrialBalanceResult> {
-//   const accounts = await prisma.account.findMany({
-//     orderBy: { code: 'asc' },
+// // ========== Trial Balance ==========
+
+// export interface TrialBalanceRow {
+//   accountId: string;
+//   code: string;
+//   name: string;
+//   type: AccountType;
+//   totalDebit: number;
+//   totalCredit: number;
+//   closingBalance: number;
+// }
+
+// export interface TrialBalanceResult {
+//   asOf: string;
+//   rows: TrialBalanceRow[];
+//   totalDebit: number;
+//   totalCredit: number;
+//   balanced: boolean;
+// }
+
+// export async function trialBalance({ asOf }: { asOf?: string | Date } = {}): Promise<TrialBalanceResult> {
+//   const accounts = await prisma.account.findMany({ 
+//     orderBy: { code: 'asc' } 
 //   });
 
 //   const lines = await prisma.journalEntryLine.findMany({
@@ -623,23 +516,25 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   });
 
 //   const totals = new Map<string, { debit: number; credit: number }>();
+  
 //   for (const line of lines) {
 //     const t = totals.get(line.accountId) ?? { debit: 0, credit: 0 };
-//     t.debit += Number(line.debit);
-//     t.credit += Number(line.credit);
+//     t.debit += line.debit;
+//     t.credit += line.credit;
 //     totals.set(line.accountId, t);
 //   }
 
 //   const rows: TrialBalanceRow[] = accounts.map((acc) => {
 //     const t = totals.get(acc.id) ?? { debit: 0, credit: 0 };
 //     const closingBalance = isDebitNormal(acc.type)
-//       ? Number(acc.openingBalance) + t.debit - t.credit
-//       : Number(acc.openingBalance) + t.credit - t.debit;
+//       ? acc.openingBalance + t.debit - t.credit
+//       : acc.openingBalance + t.credit - t.debit;
+    
 //     return {
 //       accountId: acc.id,
 //       code: acc.code,
 //       name: acc.name,
-//       type: acc.type,
+//       type: acc.type as AccountType,
 //       totalDebit: t.debit,
 //       totalCredit: t.credit,
 //       closingBalance,
@@ -658,17 +553,37 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   };
 // }
 
-// // ============================================================================
-// // 2. Account Ledger
-// // ============================================================================
+// // ========== Account Ledger ==========
 
-// /** General/account-specific ledger with a running balance, newest last. */
+// export interface AccountLedgerRow {
+//   date: Date;
+//   voucherNo: string;
+//   narration: string;
+//   referenceType?: string | null;
+//   referenceId?: string | null;
+//   debit: number;
+//   credit: number;
+//   runningBalance: number;
+// }
+
+// export interface AccountLedgerResult {
+//   account: {
+//     id: string;
+//     code: string;
+//     name: string;
+//     type: AccountType;
+//   };
+//   openingBalance: number;
+//   closingBalance: number;
+//   rows: AccountLedgerRow[];
+// }
+
 // export async function accountLedger(
-//   accountId: string,
-//   { from, to }: AccountLedgerParams = {}
+//   accountId: string, 
+//   { from, to }: { from?: string | Date; to?: string | Date } = {}
 // ): Promise<AccountLedgerResult> {
-//   const account = await prisma.account.findUnique({
-//     where: { id: accountId },
+//   const account = await prisma.account.findUnique({ 
+//     where: { id: accountId } 
 //   });
   
 //   if (!account) {
@@ -687,52 +602,78 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //     orderBy: { journalEntry: { transactionDate: 'asc' } },
 //   });
 
-//   let running = Number(account.openingBalance);
+//   let running = account.openingBalance;
 //   const debitNormal = isDebitNormal(account.type);
 
 //   const rows: AccountLedgerRow[] = lines.map((l) => {
-//     running += debitNormal 
-//       ? Number(l.debit) - Number(l.credit) 
-//       : Number(l.credit) - Number(l.debit);
+//     running += debitNormal ? l.debit - l.credit : l.credit - l.debit;
 //     return {
 //       date: l.journalEntry.transactionDate,
 //       voucherNo: l.journalEntry.voucherNo,
 //       narration: l.description ?? l.journalEntry.narration,
 //       referenceType: l.journalEntry.referenceType,
 //       referenceId: l.journalEntry.referenceId,
-//       debit: Number(l.debit),
-//       credit: Number(l.credit),
+//       debit: l.debit,
+//       credit: l.credit,
 //       runningBalance: running,
 //     };
 //   });
 
 //   return {
-//     account: {
-//       id: account.id,
-//       code: account.code,
-//       name: account.name,
-//       type: account.type,
+//     account: { 
+//       id: account.id, 
+//       code: account.code, 
+//       name: account.name, 
+//       type: account.type as AccountType 
 //     },
-//     openingBalance: Number(account.openingBalance),
+//     openingBalance: account.openingBalance,
 //     closingBalance: running,
 //     rows,
 //   };
 // }
 
-// // ============================================================================
-// // 3. Bank Reconciliation
-// // ============================================================================
+// // ========== Bank Reconciliation ==========
+
+// export interface BankReconciliationRow {
+//   id: string;
+//   date: Date;
+//   voucherNo: string;
+//   narration: string;
+//   debit: number;
+//   credit: number;
+//   runningBalance: number;
+//   isCleared: boolean;
+//   clearedDate: Date | null;
+//   isDepositInTransit: boolean;
+//   isOutstandingCheck: boolean;
+// }
+
+// export interface BankReconciliationResult {
+//   account: {
+//     id: string;
+//     code: string;
+//     name: string;
+//     type: AccountType;
+//   };
+//   openingBalance: number;
+//   bookBalance: number;
+//   statementDate: Date;
+//   rows: BankReconciliationRow[];
+//   depositsInTransit: number;
+//   outstandingChecks: number;
+//   netAdjustment: number;
+// }
 
 // export async function bankReconciliation(
-//   accountId: string,
-//   { statementDate }: BankReconciliationParams
+//   accountId: string, 
+//   { statementDate }: { statementDate: string | Date }
 // ): Promise<BankReconciliationResult> {
 //   if (!statementDate) {
 //     throw new ReportServiceError('statementDate is required', 400);
 //   }
 
-//   const account = await prisma.account.findUnique({
-//     where: { id: accountId },
+//   const account = await prisma.account.findUnique({ 
+//     where: { id: accountId } 
 //   });
   
 //   if (!account) {
@@ -754,25 +695,23 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //     ],
 //   });
 
-//   let running = Number(account.openingBalance);
+//   let running = account.openingBalance;
 //   const debitNormal = isDebitNormal(account.type);
 
 //   const rows: BankReconciliationRow[] = allLines.map((l) => {
-//     running += debitNormal 
-//       ? Number(l.debit) - Number(l.credit) 
-//       : Number(l.credit) - Number(l.debit);
+//     running += debitNormal ? l.debit - l.credit : l.credit - l.debit;
 //     return {
 //       id: l.id,
 //       date: l.journalEntry.transactionDate,
 //       voucherNo: l.journalEntry.voucherNo,
 //       narration: l.description ?? l.journalEntry.narration,
-//       debit: Number(l.debit),
-//       credit: Number(l.credit),
+//       debit: l.debit,
+//       credit: l.credit,
 //       runningBalance: running,
-//       isCleared: l.isCleared ?? false,
-//       clearedDate: l.clearedDate ?? null,
-//       isDepositInTransit: Number(l.debit) > 0 && !l.isCleared,
-//       isOutstandingCheck: Number(l.credit) > 0 && !l.isCleared,
+//       isCleared: l.isCleared,
+//       clearedDate: l.clearedDate,
+//       isDepositInTransit: l.debit > 0 && !l.isCleared,
+//       isOutstandingCheck: l.credit > 0 && !l.isCleared,
 //     };
 //   });
 
@@ -785,13 +724,13 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //     .reduce((sum, row) => sum + row.credit, 0);
 
 //   return {
-//     account: {
-//       id: account.id,
-//       code: account.code,
-//       name: account.name,
-//       type: account.type,
+//     account: { 
+//       id: account.id, 
+//       code: account.code, 
+//       name: account.name, 
+//       type: account.type as AccountType 
 //     },
-//     openingBalance: Number(account.openingBalance),
+//     openingBalance: account.openingBalance,
 //     bookBalance: running,
 //     statementDate: new Date(statementDate),
 //     rows,
@@ -801,17 +740,14 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   };
 // }
 
-// // ============================================================================
-// // 4. Set Line Cleared Status
-// // ============================================================================
+// // ========== Mark Line as Cleared ==========
 
-// /** Marks a single journal entry line as cleared/uncleared by the bank. */
 // export async function setLineClearedStatus(
-//   lineId: string,
-//   { isCleared, clearedDate }: ClearLineParams
-// ): Promise<JournalEntryLine> {
-//   const line = await prisma.journalEntryLine.findUnique({
-//     where: { id: lineId },
+//   lineId: string, 
+//   { isCleared, clearedDate }: { isCleared: boolean; clearedDate?: string | Date }
+// ) {
+//   const line = await prisma.journalEntryLine.findUnique({ 
+//     where: { id: lineId } 
 //   });
   
 //   if (!line) {
@@ -827,31 +763,40 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   });
 // }
 
-// // ============================================================================
-// // 5. Profit & Loss
-// // ============================================================================
+// // ========== Profit & Loss ==========
 
-// /** Profit & Loss for a period: Income accounts minus Expense accounts. */
+// export interface ProfitAndLossRow {
+//   code: string;
+//   name: string;
+//   type: AccountType;
+//   amount: number;
+// }
+
+// export interface ProfitAndLossResult {
+//   from: string | null;
+//   to: string | null;
+//   income: ProfitAndLossRow[];
+//   expense: ProfitAndLossRow[];
+//   totalIncome: number;
+//   totalExpense: number;
+//   netProfit: number;
+// }
+
 // export async function profitAndLoss(
-//   { from, to }: ProfitAndLossParams = {}
+//   { from, to }: { from?: string | Date; to?: string | Date } = {}
 // ): Promise<ProfitAndLossResult> {
 //   const lines = await prisma.journalEntryLine.findMany({
-//     where: {
+//     where: { 
 //       journalEntry: { 
 //         status: 'POSTED', 
 //         ...dateRangeWhere(from, to) 
-//       },
+//       } 
 //     },
 //     include: { account: true },
 //   });
 
-//   const byAccount = new Map<string, {
-//     code: string;
-//     name: string;
-//     type: string;
-//     amount: number;
-//   }>();
-
+//   const byAccount = new Map<string, ProfitAndLossRow>();
+  
 //   for (const l of lines) {
 //     if (l.account.type !== 'INCOME' && l.account.type !== 'EXPENSE') continue;
     
@@ -859,14 +804,11 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //     const cur = byAccount.get(key) ?? {
 //       code: l.account.code,
 //       name: l.account.name,
-//       type: l.account.type,
+//       type: l.account.type as AccountType,
 //       amount: 0,
 //     };
     
-//     cur.amount += l.account.type === 'INCOME' 
-//       ? Number(l.credit) - Number(l.debit) 
-//       : Number(l.debit) - Number(l.credit);
-    
+//     cur.amount += l.account.type === 'INCOME' ? l.credit - l.debit : l.debit - l.credit;
 //     byAccount.set(key, cur);
 //   }
 
@@ -877,8 +819,8 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   const totalExpense = expense.reduce((s, r) => s + r.amount, 0);
 
 //   return {
-//     from: from ?? null,
-//     to: to ?? null,
+//     from: from ? new Date(from).toISOString() : null,
+//     to: to ? new Date(to).toISOString() : null,
 //     income,
 //     expense,
 //     totalIncome,
@@ -887,18 +829,56 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   };
 // }
 
-// // ============================================================================
-// // 6. Balance Sheet
-// // ============================================================================
+// // ========== Balance Sheet ==========
 
-// /** Balance Sheet as of a date: Assets vs Liabilities + Equity (+ retained P&L). */
-// export async function balanceSheet(
-//   { asOf }: BalanceSheetParams = {}
-// ): Promise<BalanceSheetResult> {
+// export interface BalanceSheetRow {
+//   code: string;
+//   name: string;
+//   type: AccountType;
+//   closingBalance: number;
+// }
+
+// export interface BalanceSheetResult {
+//   asOf: string;
+//   assets: BalanceSheetRow[];
+//   liabilities: BalanceSheetRow[];
+//   equity: BalanceSheetRow[];
+//   retainedEarnings: number;
+//   totalAssets: number;
+//   totalLiabilities: number;
+//   totalEquity: number;
+//   balanced: boolean;
+// }
+
+// export async function balanceSheet({ asOf }: { asOf?: string | Date } = {}): Promise<BalanceSheetResult> {
 //   const tb = await trialBalance({ asOf });
-//   const assets = tb.rows.filter((r) => r.type === 'ASSET');
-//   const liabilities = tb.rows.filter((r) => r.type === 'LIABILITY');
-//   const equity = tb.rows.filter((r) => r.type === 'EQUITY');
+  
+//   const assets = tb.rows
+//     .filter((r) => r.type === 'ASSET')
+//     .map((r) => ({
+//       code: r.code,
+//       name: r.name,
+//       type: r.type,
+//       closingBalance: r.closingBalance,
+//     }));
+    
+//   const liabilities = tb.rows
+//     .filter((r) => r.type === 'LIABILITY')
+//     .map((r) => ({
+//       code: r.code,
+//       name: r.name,
+//       type: r.type,
+//       closingBalance: r.closingBalance,
+//     }));
+    
+//   const equity = tb.rows
+//     .filter((r) => r.type === 'EQUITY')
+//     .map((r) => ({
+//       code: r.code,
+//       name: r.name,
+//       type: r.type,
+//       closingBalance: r.closingBalance,
+//     }));
 
 //   const pnl = await profitAndLoss({ to: asOf });
 
@@ -919,70 +899,88 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   };
 // }
 
-// // ============================================================================
-// // 7. Customer Ledger
-// // ============================================================================
+// // ========== Customer Ledger ==========
 
-// /**
-//  * Customer Ledger: every posted journal line whose journal entry traces
-//  * back (via referenceId) to one of this customer's loan applications.
-//  * This works without a customer-specific sub-ledger account by resolving
-//  * the customer's loanApplicationIds first.
-//  */
-// export async function customerLedger(
-//   customerId: string
-// ): Promise<CustomerLedgerResult> {
+// export interface CustomerLedgerResult {
+//   customerId: string;
+//   loans: Array<{ id: string; loanNumber: string }>;
+//   entries: any[]; // Can be more specific based on your JournalEntry type
+// }
+
+// export async function customerLedger(customerId: string): Promise<CustomerLedgerResult> {
 //   const loans = await prisma.loanApplication.findMany({
 //     where: { customerId },
 //     select: { id: true, loanNumber: true },
 //   });
   
 //   const loanIds = loans.map(({ id }) => id);
+  
 //   if (loanIds.length === 0) {
 //     return { customerId, loans: [], entries: [] };
 //   }
 
 //   const entries = await prisma.journalEntry.findMany({
-//     where: {
-//       status: 'POSTED',
-//       referenceId: { in: loanIds },
+//     where: { 
+//       status: 'POSTED', 
+//       referenceId: { in: loanIds } 
 //     },
-//     include: { lines: { include: { account: true } } },
+//     include: { 
+//       lines: { 
+//         include: { account: true } 
+//       } 
+//     },
 //     orderBy: { transactionDate: 'asc' },
 //   });
 
 //   return { customerId, loans, entries };
 // }
 
-// // ============================================================================
-// // 8. Branch Wise Summary
-// // ============================================================================
+// // ========== Branch Wise Summary ==========
 
-// /** Branch-wise summary — sums posted disbursement/EMI/recovery amounts per branch. */
+// export interface BranchWiseSummaryOptions {
+//   from?: string | Date;
+//   to?: string | Date;
+//   branchId?: string;
+//   branchSearch?: string;
+// }
+
+// export interface BranchWiseSummaryRow {
+//   branchId: string;
+//   branchCode: string | null;
+//   branchName: string | null;
+//   _sum?: { amount: number };
+//   _count?: { _all: number };
+// }
+
+// export interface BranchWiseSummaryResult {
+//   disbursementsByBranch: BranchWiseSummaryRow[];
+//   applicationsByBranch: BranchWiseSummaryRow[];
+// }
+
 // export async function branchWiseSummary({
 //   from,
 //   to,
 //   branchId,
-//   branchSearch,
-// }: BranchWiseSummaryParams = {}): Promise<BranchWiseSummaryResult> {
+//   branchSearch
+// }: BranchWiseSummaryOptions = {}): Promise<BranchWiseSummaryResult> {
 //   const searchCondition = branchSearch
 //     ? {
 //         branch: {
 //           OR: [
-//             { name: { contains: branchSearch, mode: 'insensitive' as any } },
-//             { code: { contains: branchSearch, mode: 'insensitive' as any } },
+//             { name: { contains: branchSearch } },
+//             { code: { contains: branchSearch } },
 //           ],
 //         },
 //       }
 //     : {};
-  
-//   const branchWhere: any = {
+    
+//   const branchWhere = {
 //     ...(branchId ? { branchId } : {}),
 //     ...searchCondition,
 //   };
 
-//   let disbursements: any[];
-//   let recoveries: any[];
+//   let disbursements;
+//   let recoveries;
   
 //   try {
 //     [disbursements, recoveries] = await Promise.all([
@@ -1008,19 +1006,16 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //       }),
 //     ]);
 //   } catch (err) {
-//     // Provide a clearer, actionable error to the API consumer instead of
-//     // forwarding the raw Prisma error which can be confusing or leak
-//     // implementation details.
 //     throw new ReportServiceError(
 //       'Branch search failed: invalid search parameter or unsupported database feature. Try a simpler search term.',
-//       400
+//       400,
 //     );
 //   }
 
 //   const branchIds = Array.from(
 //     new Set([
-//       ...disbursements.map((d: any) => d.branchId),
-//       ...recoveries.map((r: any) => r.branchId),
+//       ...disbursements.map((d: { branchId: string }) => d.branchId),
+//       ...recoveries.map((r: { branchId: string }) => r.branchId),
 //     ].filter(Boolean))
 //   );
   
@@ -1030,8 +1025,8 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //         select: { id: true, code: true, name: true },
 //       })
 //     : [];
-  
-//   const branchMap = new Map(branches.map((b) => [b.id, b]));
+    
+//   const branchMap = new Map<string, Branch>(branches.map((b) => [b.id, b]));
 
 //   const attachBranch = (row: any): BranchWiseSummaryRow => ({
 //     ...row,
@@ -1045,17 +1040,11 @@ export async function branchWiseSummary({ from, to, branchId, branchSearch } = {
 //   };
 // }
 
-// // ============================================================================
-// // Optional: Service Interface
-// // ============================================================================
+// // ==================== Exports ====================
 
-// export interface ReportService {
-//   trialBalance: (params?: TrialBalanceParams) => Promise<TrialBalanceResult>;
-//   accountLedger: (accountId: string, params?: AccountLedgerParams) => Promise<AccountLedgerResult>;
-//   bankReconciliation: (accountId: string, params: BankReconciliationParams) => Promise<BankReconciliationResult>;
-//   setLineClearedStatus: (lineId: string, params: ClearLineParams) => Promise<JournalEntryLine>;
-//   profitAndLoss: (params?: ProfitAndLossParams) => Promise<ProfitAndLossResult>;
-//   balanceSheet: (params?: BalanceSheetParams) => Promise<BalanceSheetResult>;
-//   customerLedger: (customerId: string) => Promise<CustomerLedgerResult>;
-//   branchWiseSummary: (params?: BranchWiseSummaryParams) => Promise<BranchWiseSummaryResult>;
-// }
+// export { 
+//   ReportServiceError,
+//   startOfDay,
+//   endOfDay,
+//   dateRangeWhere
+// };

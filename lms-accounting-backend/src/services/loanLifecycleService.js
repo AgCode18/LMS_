@@ -333,44 +333,39 @@ export async function recordRecoveryPayment({
 // Typescript code  👇👇
 
 
-// import { Prisma, LoanApplication, LoanDisbursement, LoanEmiSchedule, EmiPayment, LoanRecovery, RecoveryPayment } from "@prisma/client";
+
+
+
 // import prisma from "../lib/prisma.js";
 // import * as autoPosting from "./autoPostingService.js";
+// import { Prisma, PrismaClient } from "@prisma/client";
 
 // // ============================================================================
-// // Error Class
+// // Types & Interfaces
 // // ============================================================================
 
-// export class LifecycleError extends Error {
-//   public status: number;
-//   public details?: any;
-  
-//   constructor(message: string, status: number = 400, details?: any) {
-//     super(message);
-//     this.name = "LifecycleError";
-//     this.status = status;
-//     this.details = details;
-//     Object.setPrototypeOf(this, LifecycleError.prototype);
-//   }
+// export interface DisbursementEligibilityResult {
+//   eligible: boolean;
+//   reasons: string[];
+//   loan: any; // Replace with proper Prisma type
+//   sanction: any; // Replace with proper Prisma type
+//   nach: any; // Replace with proper Prisma type
 // }
-
-// // ============================================================================
-// // Type Definitions
-// // ============================================================================
-
-// export type DisbursementMode = "BANK_TRANSFER" | "CASH" | "CHEQUE" | "UPI";
-// export type PaymentMode = "UPI" | "CASH" | "BANK_TRANSFER" | "CHEQUE" | "CARD";
-// export type LoanStatus = "DRAFT" | "PENDING" | "APPROVED" | "ACTIVE" | "CLOSED" | "WRITTEN_OFF" | "REJECTED";
 
 // export interface DisbursementInput {
 //   loanApplicationId: string;
-//   disbursementMode: DisbursementMode;
-//   bankName?: string;
-//   bankAccountNumber?: string;
-//   ifscCode?: string;
-//   accountHolderName?: string;
+//   disbursementMode: string;
+//   bankName: string;
+//   bankAccountNumber: string;
+//   ifscCode: string;
+//   accountHolderName: string;
 //   transactionReference?: string;
-//   processedBy?: string;
+//   processedBy: string;
+// }
+
+// export interface DisbursementResult {
+//   disbursement: any; // Replace with proper Prisma type
+//   journalEntry: any; // Replace with proper Prisma type
 // }
 
 // export interface EmiCollectionInput {
@@ -379,10 +374,15 @@ export async function recordRecoveryPayment({
 //   interestAmount?: number;
 //   penaltyAmount?: number;
 //   bounceAmount?: number;
-//   paymentMode: PaymentMode;
+//   paymentMode: string;
 //   transactionReference?: string;
-//   processedById?: string;
-//   branchId?: string;
+//   processedById: string;
+//   branchId: string;
+// }
+
+// export interface EmiCollectionResult {
+//   emiPayment: any; // Replace with proper Prisma type
+//   journalEntry: any; // Replace with proper Prisma type
 // }
 
 // export interface PenaltyCollectionInput {
@@ -399,7 +399,7 @@ export async function recordRecoveryPayment({
 // export interface RefundInput {
 //   referenceId: string;
 //   amount: number;
-//   reason?: string;
+//   reason: string;
 // }
 
 // export interface WriteOffInput {
@@ -410,67 +410,39 @@ export async function recordRecoveryPayment({
 // export interface RecoveryPaymentInput {
 //   loanRecoveryId: string;
 //   amount: number;
-//   paymentMode: PaymentMode;
-//   referenceNo?: string;
-// }
-
-// export interface EligibilityResult {
-//   eligible: boolean;
-//   reasons: string[];
-//   loan: LoanApplication & {
-//     kyc: any;
-//     sanctions: any[];
-//     nachMandates: any[];
-//     loanDisbursement: any[];
-//   };
-//   sanction: any;
-//   nach: any;
-// }
-
-// export interface DisbursementResult {
-//   disbursement: LoanDisbursement;
-//   journalEntry: any;
-// }
-
-// export interface EmiCollectionResult {
-//   emiPayment: EmiPayment;
-//   journalEntry: any;
-// }
-
-// export interface PenaltyCollectionResult {
-//   journalEntry: any;
-// }
-
-// export interface ProcessingFeeResult {
-//   journalEntry: any;
-// }
-
-// export interface RefundResult {
-//   journalEntry: any;
-// }
-
-// export interface WriteOffResult {
-//   journalEntry: any;
-// }
-
-// export interface RecoveryPaymentResult {
-//   recoveryPayment: RecoveryPayment;
-//   journalEntry: any;
+//   paymentMode: string;
+//   referenceNo: string;
 // }
 
 // // ============================================================================
-// // Disbursement Eligibility Check
+// // Custom Error Class
+// // ============================================================================
+
+// export class LifecycleError extends Error {
+//   public readonly status: number;
+//   public readonly details?: string[];
+
+//   constructor(message: string, status: number = 400, details?: string[]) {
+//     super(message);
+//     this.name = "LifecycleError";
+//     this.status = status;
+//     this.details = details;
+//   }
+// }
+
+// // ============================================================================
+// // 1. Disbursement Eligibility Check
 // // ============================================================================
 
 // /**
-//  * Disbursement eligibility — verifies KYC, Sanction and NACH before a
-//  * loan is allowed to be disbursed. This is the "automatic status-check
-//  * workflow" you asked for: nothing gets disbursed until all three gates
-//  * pass, and re-disbursement on an already-disbursed loan is blocked too.
+//  * Checks if a loan application is eligible for disbursement
+//  * @param loanApplicationId - The ID of the loan application
+//  * @returns Eligibility result with reasons if not eligible
+//  * @throws {LifecycleError} If loan application not found
 //  */
 // export async function checkDisbursementEligibility(
 //   loanApplicationId: string
-// ): Promise<EligibilityResult> {
+// ): Promise<DisbursementEligibilityResult> {
 //   const loan = await prisma.loanApplication.findUnique({
 //     where: { id: loanApplicationId },
 //     include: {
@@ -494,7 +466,7 @@ export async function recordRecoveryPayment({
 //     );
 //   }
 
-//   // Check Sanction status
+//   // Check sanction status
 //   const latestSanction = loan.sanctions[0];
 //   if (latestSanction?.status !== "APPROVED") {
 //     reasons.push(
@@ -521,26 +493,36 @@ export async function recordRecoveryPayment({
 //   return {
 //     eligible: reasons.length === 0,
 //     reasons,
-//     loan: loan as any,
+//     loan,
 //     sanction: latestSanction,
 //     nach: latestNach,
 //   };
 // }
 
 // // ============================================================================
-// // 1. Loan Disbursement
+// // 2. Loan Disbursement
 // // ============================================================================
 
-// export async function disburseLoan({
-//   loanApplicationId,
-//   disbursementMode,
-//   bankName,
-//   bankAccountNumber,
-//   ifscCode,
-//   accountHolderName,
-//   transactionReference,
-//   processedBy,
-// }: DisbursementInput): Promise<DisbursementResult> {
+// /**
+//  * Disburses a loan after eligibility check
+//  * @param input - Disbursement input parameters
+//  * @returns Disbursement and journal entry details
+//  * @throws {LifecycleError} If loan is not eligible or not found
+//  */
+// export async function disburseLoan(
+//   input: DisbursementInput
+// ): Promise<DisbursementResult> {
+//   const {
+//     loanApplicationId,
+//     disbursementMode,
+//     bankName,
+//     bankAccountNumber,
+//     ifscCode,
+//     accountHolderName,
+//     transactionReference,
+//     processedBy,
+//   } = input;
+
 //   const eligibility = await checkDisbursementEligibility(loanApplicationId);
 //   if (!eligibility.eligible) {
 //     throw new LifecycleError(
@@ -553,7 +535,7 @@ export async function recordRecoveryPayment({
 //   const { loan } = eligibility;
 //   const amount = loan.approvedAmount ?? loan.requestedAmount;
 
-//   // Step 1: the LMS-side record, in its own transaction.
+//   // Step 1: Create disbursement record in transaction
 //   const disbursement = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
 //     const created = await tx.loanDisbursement.create({
 //       data: {
@@ -581,7 +563,7 @@ export async function recordRecoveryPayment({
 //     return created;
 //   });
 
-//   // Step 2: hand off to the accounting engine — this is the automatic part.
+//   // Step 2: Create accounting journal entry
 //   const journalEntry = await autoPosting.postLoanDisbursement({
 //     loanDisbursementId: disbursement.id,
 //     loanApplicationId,
@@ -593,28 +575,38 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 2. EMI Collection
+// // 3. EMI Collection
 // // ============================================================================
 
-// export async function collectEmi({
-//   emiScheduleId,
-//   principalAmount = 0,
-//   interestAmount = 0,
-//   penaltyAmount = 0,
-//   bounceAmount = 0,
-//   paymentMode,
-//   transactionReference,
-//   processedById,
-//   branchId,
-// }: EmiCollectionInput): Promise<EmiCollectionResult> {
+// /**
+//  * Collects EMI payment and creates accounting entries
+//  * @param input - EMI collection input parameters
+//  * @returns EMI payment and journal entry details
+//  * @throws {LifecycleError} If EMI schedule not found or already paid
+//  */
+// export async function collectEmi(
+//   input: EmiCollectionInput
+// ): Promise<EmiCollectionResult> {
+//   const {
+//     emiScheduleId,
+//     principalAmount = 0,
+//     interestAmount = 0,
+//     penaltyAmount = 0,
+//     bounceAmount = 0,
+//     paymentMode,
+//     transactionReference,
+//     processedById,
+//     branchId,
+//   } = input;
+
 //   const schedule = await prisma.loanEmiSchedule.findUnique({
 //     where: { id: emiScheduleId },
 //   });
-  
+
 //   if (!schedule) {
 //     throw new LifecycleError("EMI schedule not found", 404);
 //   }
-  
+
 //   if (schedule.status === "paid") {
 //     throw new LifecycleError("This EMI has already been marked paid", 409);
 //   }
@@ -660,17 +652,24 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 3. Standalone penalty collection (outside a regular EMI)
+// // 4. Standalone Penalty Collection
 // // ============================================================================
 
-// export async function collectPenalty({
-//   loanApplicationId,
-//   amount,
-// }: PenaltyCollectionInput): Promise<PenaltyCollectionResult> {
+// /**
+//  * Collects penalty outside of regular EMI
+//  * @param input - Penalty collection input
+//  * @returns Journal entry details
+//  * @throws {LifecycleError} If loan application not found
+//  */
+// export async function collectPenalty(
+//   input: PenaltyCollectionInput
+// ): Promise<{ journalEntry: any }> {
+//   const { loanApplicationId, amount } = input;
+
 //   const loan = await prisma.loanApplication.findUnique({
 //     where: { id: loanApplicationId },
 //   });
-  
+
 //   if (!loan) {
 //     throw new LifecycleError("Loan application not found", 404);
 //   }
@@ -684,18 +683,24 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 4. Processing fee
+// // 5. Processing Fee
 // // ============================================================================
 
-// export async function chargeProcessingFee({
-//   loanApplicationId,
-//   amount,
-//   collectedImmediately = true,
-// }: ProcessingFeeInput): Promise<ProcessingFeeResult> {
+// /**
+//  * Charges processing fee for a loan application
+//  * @param input - Processing fee input
+//  * @returns Journal entry details
+//  * @throws {LifecycleError} If loan application not found
+//  */
+// export async function chargeProcessingFee(
+//   input: ProcessingFeeInput
+// ): Promise<{ journalEntry: any }> {
+//   const { loanApplicationId, amount, collectedImmediately = true } = input;
+
 //   const loan = await prisma.loanApplication.findUnique({
 //     where: { id: loanApplicationId },
 //   });
-  
+
 //   if (!loan) {
 //     throw new LifecycleError("Loan application not found", 404);
 //   }
@@ -715,38 +720,51 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 5. Refund
+// // 6. Refund
 // // ============================================================================
 
-// export async function issueRefund({
-//   referenceId,
-//   amount,
-//   reason,
-// }: RefundInput): Promise<RefundResult> {
+// /**
+//  * Issues a refund
+//  * @param input - Refund input
+//  * @returns Journal entry details
+//  */
+// export async function issueRefund(
+//   input: RefundInput
+// ): Promise<{ journalEntry: any }> {
+//   const { referenceId, amount, reason } = input;
+
 //   const journalEntry = await autoPosting.postRefund({
 //     referenceId,
 //     amount,
 //     reason,
 //   });
+
 //   return { journalEntry };
 // }
 
 // // ============================================================================
-// // 6. Write-off
+// // 7. Write-off
 // // ============================================================================
 
-// export async function writeOffLoan({
-//   loanApplicationId,
-//   amount,
-// }: WriteOffInput): Promise<WriteOffResult> {
+// /**
+//  * Writes off a loan
+//  * @param input - Write-off input
+//  * @returns Journal entry details
+//  * @throws {LifecycleError} If loan not found or already written off
+//  */
+// export async function writeOffLoan(
+//   input: WriteOffInput
+// ): Promise<{ journalEntry: any }> {
+//   const { loanApplicationId, amount } = input;
+
 //   const loan = await prisma.loanApplication.findUnique({
 //     where: { id: loanApplicationId },
 //   });
-  
+
 //   if (!loan) {
 //     throw new LifecycleError("Loan application not found", 404);
 //   }
-  
+
 //   if (loan.status === "WRITTEN_OFF") {
 //     throw new LifecycleError("Loan is already written off", 409);
 //   }
@@ -765,23 +783,28 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // 7. Recovery payment
+// // 8. Recovery Payment
 // // ============================================================================
 
-// export async function recordRecoveryPayment({
-//   loanRecoveryId,
-//   amount,
-//   paymentMode,
-//   referenceNo,
-// }: RecoveryPaymentInput): Promise<RecoveryPaymentResult> {
+// /**
+//  * Records a recovery payment
+//  * @param input - Recovery payment input
+//  * @returns Recovery payment and journal entry details
+//  * @throws {LifecycleError} If recovery record not found or amount exceeds balance
+//  */
+// export async function recordRecoveryPayment(
+//   input: RecoveryPaymentInput
+// ): Promise<{ recoveryPayment: any; journalEntry: any }> {
+//   const { loanRecoveryId, amount, paymentMode, referenceNo } = input;
+
 //   const recovery = await prisma.loanRecovery.findUnique({
 //     where: { id: loanRecoveryId },
 //   });
-  
+
 //   if (!recovery) {
 //     throw new LifecycleError("Loan recovery record not found", 404);
 //   }
-  
+
 //   if (amount > recovery.balanceAmount) {
 //     throw new LifecycleError(
 //       `Amount ${amount} exceeds outstanding balance ${recovery.balanceAmount}`,
@@ -822,51 +845,17 @@ export async function recordRecoveryPayment({
 // }
 
 // // ============================================================================
-// // Optional: Service Interface
+// // Export all functions
 // // ============================================================================
 
-// export interface LoanLifecycleService {
-//   checkDisbursementEligibility: (loanApplicationId: string) => Promise<EligibilityResult>;
-//   disburseLoan: (input: DisbursementInput) => Promise<DisbursementResult>;
-//   collectEmi: (input: EmiCollectionInput) => Promise<EmiCollectionResult>;
-//   collectPenalty: (input: PenaltyCollectionInput) => Promise<PenaltyCollectionResult>;
-//   chargeProcessingFee: (input: ProcessingFeeInput) => Promise<ProcessingFeeResult>;
-//   issueRefund: (input: RefundInput) => Promise<RefundResult>;
-//   writeOffLoan: (input: WriteOffInput) => Promise<WriteOffResult>;
-//   recordRecoveryPayment: (input: RecoveryPaymentInput) => Promise<RecoveryPaymentResult>;
-// }
-
-// // ============================================================================
-// // Optional: Helper Functions
-// // ============================================================================
-
-// /**
-//  * Helper to get loan status summary
-//  */
-// export async function getLoanStatusSummary(loanApplicationId: string) {
-//   const loan = await prisma.loanApplication.findUnique({
-//     where: { id: loanApplicationId },
-//     include: {
-//       kyc: true,
-//       sanctions: { orderBy: { createdAt: "desc" }, take: 1 },
-//       nachMandates: { orderBy: { createdAt: "desc" }, take: 1 },
-//       loanDisbursement: {
-//         where: { accountingStatus: "POSTED" },
-//       },
-//     },
-//   });
-
-//   if (!loan) {
-//     throw new LifecycleError("Loan application not found", 404);
-//   }
-
-//   return {
-//     id: loan.id,
-//     status: loan.status,
-//     kycStatus: loan.kyc?.status,
-//     sanctionStatus: loan.sanctions[0]?.status,
-//     nachStatus: loan.nachMandates[0]?.status,
-//     isDisbursed: loan.loanDisbursement.length > 0,
-//     disbursementAmount: loan.loanDisbursement[0]?.amount,
-//   };
-// }
+// export default {
+//   LifecycleError,
+//   checkDisbursementEligibility,
+//   disburseLoan,
+//   collectEmi,
+//   collectPenalty,
+//   chargeProcessingFee,
+//   issueRefund,
+//   writeOffLoan,
+//   recordRecoveryPayment,
+// };
