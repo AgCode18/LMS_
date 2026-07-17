@@ -26,6 +26,8 @@ export default function AccountLedger() {
   const [error, setError] = useState('');
   const PAGE_SIZE = 10;
 
+
+
   useEffect(() => {
     api.getAccounts().then(setAccounts).catch((e) => setError(e.message));
   }, []);
